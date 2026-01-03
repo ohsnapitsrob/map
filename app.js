@@ -1,8 +1,12 @@
 // =====================
-// CONFIG
+// CONFIG (from config.js)
 // =====================
-const MAPTILER_KEY = "4iGDVzk2f6BFmiqgFyyU";
-const MAP_STYLE = "streets";
+const { MAPTILER_KEY, MAP_STYLE } = window.APP_CONFIG || {};
+
+if (!MAPTILER_KEY) {
+  alert("MAPTILER_KEY is missing. Please set it in config.js");
+  throw new Error("Missing MAPTILER_KEY");
+}
 
 // =====================
 // MAP
@@ -59,12 +63,10 @@ const resultsCloseBtn = document.getElementById("resultsCloseBtn");
 
 function openResultsModal() {
   resultsModal.classList.add("open");
-  resultsModal.setAttribute("aria-hidden", "false");
 }
 
 function closeResultsModal() {
   resultsModal.classList.remove("open");
-  resultsModal.setAttribute("aria-hidden", "true");
 }
 
 resultsCloseBtn.onclick = closeResultsModal;
@@ -80,7 +82,6 @@ const mTitle = document.getElementById("mTitle");
 const mMeta = document.getElementById("mMeta");
 const mDesc = document.getElementById("mDesc");
 const mGallery = document.getElementById("mGallery");
-const closeBtn = document.getElementById("closeBtn");
 
 function openModal(loc) {
   mTitle.textContent = loc.title || "";
@@ -89,9 +90,7 @@ function openModal(loc) {
 
   mGallery.innerHTML = "";
   if (!loc.images || !loc.images.length) {
-    const p = document.createElement("p");
-    p.textContent = "No images yet.";
-    mGallery.appendChild(p);
+    mGallery.innerHTML = "<p>No images yet.</p>";
   } else {
     loc.images.forEach((src) => {
       const img = document.createElement("img");
@@ -102,29 +101,13 @@ function openModal(loc) {
   }
 
   modal.classList.add("open");
-  modal.setAttribute("aria-hidden", "false");
 }
 
-function closeLocationModal() {
-  modal.classList.remove("open");
-  modal.setAttribute("aria-hidden", "true");
-}
-
-closeBtn.onclick = closeLocationModal;
-modal.onclick = (e) => {
-  if (e.target === modal) closeLocationModal();
-};
-
-// ESC closes whichever modal is open (nice UX)
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") {
-    if (modal.classList.contains("open")) closeLocationModal();
-    if (resultsModal.classList.contains("open")) closeResultsModal();
-  }
-});
+document.getElementById("closeBtn").onclick = () => modal.classList.remove("open");
+modal.onclick = (e) => { if (e.target === modal) modal.classList.remove("open"); };
 
 // =====================
-// DATA + SEARCH
+// SEARCH + DATA
 // =====================
 let ALL = [];
 let allMarkers = [];
@@ -154,50 +137,8 @@ showAllBtn.onclick = () => {
   showAll();
 };
 
-function filterGroup(kind, label, groupsIndex) {
-  const markers = groupsIndex.get(`${kind}::${label}`) || [];
-  rebuildCluster(markers);
-
-  // keep results modal open and show places list for that group (best UX)
-  activeTab = "places";
-  tabPlaces.classList.add("active");
-  tabGroups.classList.remove("active");
-
-  resultsEl.innerHTML = "";
-
-  const header = document.createElement("div");
-  header.className = "card";
-  header.style.cursor = "default";
-  header.innerHTML = `<div class="title">${label}</div>
-                      <div class="meta">${kind} • ${markers.length.toLocaleString()} locations</div>`;
-  resultsEl.appendChild(header);
-
-  markers.slice(0, 200).forEach((mk) => {
-    const loc = mk.__loc;
-    const card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML = `<div class="title">${loc.place || "(Unknown place)"}</div>
-                      <div class="meta">${loc.title || ""}${loc.country ? " • " + loc.country : ""}</div>`;
-    card.onclick = () => {
-      map.setView([loc.lat, loc.lng], 16);
-      openModal(loc);
-    };
-    resultsEl.appendChild(card);
-  });
-
-  if (markers.length > 200) {
-    const more = document.createElement("div");
-    more.className = "card";
-    more.style.cursor = "default";
-    more.innerHTML = `<div class="meta">Showing first 200 places here. (All are still on the map.)</div>`;
-    resultsEl.appendChild(more);
-  }
-}
-
 function runSearch(q) {
   const query = norm(q);
-
-  // If empty: close results modal and don't filter the map
   if (!query) {
     closeResultsModal();
     return;
@@ -206,50 +147,94 @@ function runSearch(q) {
   openResultsModal();
   resultsEl.innerHTML = "";
 
-  // NOTE: fuseGroups needs a groupsIndex map (built at load)
-  if (!runSearch._groupsIndex) {
-    // should be set after data load
-    runSearch._groupsIndex = new Map();
-  }
-  const groupsIndex = runSearch._groupsIndex;
-
   if (activeTab === "groups") {
-    const groupHits = fuseGroups.search(query).slice(0, 30);
-
-    if (!groupHits.length) {
-      const empty = document.createElement("div");
-      empty.className = "card";
-      empty.style.cursor = "default";
-      empty.innerHTML = `<div class="title">No matches</div><div class="meta">Try a different search.</div>`;
-      resultsEl.appendChild(empty);
-      return;
-    }
-
-    groupHits.forEach((r) => {
+    fuseGroups.search(query).slice(0, 30).forEach(r => {
       const { kind, label, count } = r.item;
       const card = document.createElement("div");
       card.className = "card";
       card.innerHTML = `<div class="title">${label}</div>
-                        <div class="meta">${kind} • ${count.toLocaleString()} locations</div>`;
-      card.onclick = () => filterGroup(kind, label, groupsIndex);
+                        <div class="meta">${kind} • ${count} locations</div>`;
+      card.onclick = () => filterGroup(kind, label);
       resultsEl.appendChild(card);
     });
     return;
   }
 
-  // Places search
-  const locHits = fuseLocations.search(query).slice(0, 50).map((r) => r.item);
+  const hits = fuseLocations.search(query).slice(0, 50).map(r => r.item);
+  rebuildCluster(hits.map(l => l.__marker));
 
-  if (!locHits.length) {
-    rebuildCluster([]); // show none (feels consistent)
-    const empty = document.createElement("div");
-    empty.className = "card";
-    empty.style.cursor = "default";
-    empty.innerHTML = `<div class="title">No matches</div><div class="meta">Try a collection, country, or keyword.</div>`;
-    resultsEl.appendChild(empty);
-    return;
+  hits.forEach(loc => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `<div class="title">${loc.place}</div>
+                      <div class="meta">${loc.title} • ${loc.country}</div>`;
+    card.onclick = () => {
+      map.setView([loc.lat, loc.lng], 16);
+      openModal(loc);
+    };
+    resultsEl.appendChild(card);
+  });
+}
+
+// Input + Enter support
+searchInput.addEventListener("input", () => runSearch(searchInput.value));
+searchInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    runSearch(searchInput.value);
   }
+});
 
-  // Filter map markers to hits (cap for performance)
-  const hitMarkers = locHits
-    .slice(0,
+// =====================
+// LOAD DATA
+// =====================
+fetch("./data/locations.json")
+  .then(r => r.json())
+  .then(data => {
+    ALL = data;
+
+    const markersByTitle = new Map();
+    const markersByCollection = new Map();
+
+    function add(map, key, val) {
+      if (!key) return;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(val);
+    }
+
+    ALL.forEach(loc => {
+      if (typeof loc.lat !== "number" || typeof loc.lng !== "number") return;
+
+      const mk = L.marker([loc.lat, loc.lng]);
+      mk.__loc = loc;
+      mk.on("click", () => openModal(loc));
+      loc.__marker = mk;
+
+      allMarkers.push(mk);
+      add(markersByTitle, norm(loc.title), mk);
+      safeArr(loc.collections).forEach(c => add(markersByCollection, norm(c), mk));
+    });
+
+    rebuildCluster(allMarkers);
+
+    fuseLocations = new Fuse(ALL, {
+      threshold: 0.35,
+      keys: [
+        { name: "title", weight: 3 },
+        { name: "collections", weight: 2 },
+        { name: "place", weight: 1.7 },
+        { name: "country", weight: 1.2 },
+        { name: "keywords", weight: 1.4 },
+        { name: "description", weight: 0.8 }
+      ]
+    });
+
+    const groups = [];
+    markersByTitle.forEach((v, k) => groups.push({ kind: "Title", label: k, count: v.length }));
+    markersByCollection.forEach((v, k) => groups.push({ kind: "Collection", label: k, count: v.length }));
+
+    fuseGroups = new Fuse(groups, {
+      threshold: 0.35,
+      keys: ["label"]
+    });
+  });
