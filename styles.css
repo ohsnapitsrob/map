@@ -4,6 +4,10 @@
 
 * { box-sizing: border-box; }
 
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 html, body {
   height: 100%;
   margin: 0;
@@ -43,7 +47,9 @@ body {
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 12px;
-  font-size: 14px;
+
+  /* iOS Safari will zoom inputs if font-size < 16px */
+  font-size: 16px;
 }
 
 .topbar-actions {
