@@ -126,6 +126,8 @@ App.UI = (function () {
         title: App.Modal.escapeHtml(loc.place || "(Unknown place)"),
         meta: `${App.Modal.escapeHtml(loc.title || "")}${loc.country ? " • " + App.Modal.escapeHtml(loc.country) : ""}`,
         onClick: () => {
+          // Close results modal before opening location modal (so it doesn't sit behind)
+          closeResultsModal();
           App.Map.getMap().setView([loc.lat, loc.lng], 16);
           App.Modal.open(loc);
         }
@@ -148,6 +150,8 @@ App.UI = (function () {
         title: App.Modal.escapeHtml(loc.place || "(Unknown place)"),
         meta: `${App.Modal.escapeHtml(loc.title || "")}${loc.country ? " • " + App.Modal.escapeHtml(loc.country) : ""}`,
         onClick: () => {
+          // Close results modal before opening location modal
+          closeResultsModal();
           App.Map.getMap().setView([loc.lat, loc.lng], 16);
           App.Modal.open(loc);
         }
