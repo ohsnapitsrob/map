@@ -1,27 +1,41 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Locations Map</title>
+  <title>On the Map</title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div class="layout">
-    <aside class="sidebar">
-      <h1>On the Map</h1>
 
-      <input id="search" type="search" placeholder="Search title, place, collection, keyword…" autocomplete="off" />
-      <div class="hint">Examples: “James Bond”, “Louvre”, “Red Dwarf”, “Liverpool”</div>
+  <!-- MAP -->
+  <div id="map"></div>
 
-      <div class="row">
-        <button id="showAll" class="btn">Show all</button>
-        <span id="count" class="count"></span>
-      </div>
+  <!-- TOP SEARCH BAR -->
+  <div class="topbar">
+    <div class="topbar-inner">
+      <input
+        id="search"
+        type="search"
+        placeholder="Search title, place, collection, keyword…"
+        autocomplete="off"
+      />
+      <button id="showAll" class="btn">Show all</button>
+    </div>
+    <div class="topbar-meta">
+      <span id="count" class="count"></span>
+    </div>
+  </div>
+
+  <!-- RESULTS MODAL -->
+  <div id="resultsModal" class="modal" aria-hidden="true">
+    <div class="modal-card">
+      <button id="resultsCloseBtn" class="btn close">Close</button>
 
       <div class="tabs">
         <button id="tabGroups" class="tab active">Groups</button>
@@ -29,13 +43,11 @@
       </div>
 
       <div id="results" class="results"></div>
-    </aside>
-
-    <main id="map"></main>
+    </div>
   </div>
 
-  <!-- Modal -->
-  <div id="modal" class="modal" aria-hidden="true">
+  <!-- LOCATION MODAL -->
+  <div id="modal" class="modal location-modal" aria-hidden="true">
     <div class="modal-card">
       <button id="closeBtn" class="btn close">Close</button>
       <h2 id="mTitle"></h2>
@@ -48,6 +60,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <script src="https://unpkg.com/fuse.js@7.0.0/dist/fuse.min.js"></script>
+
   <script src="app.js"></script>
 </body>
 </html>
