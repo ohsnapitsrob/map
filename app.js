@@ -33,6 +33,8 @@ const searchInput = document.getElementById("search");
 const resultsEl = document.getElementById("results");
 const countEl = document.getElementById("count");
 const showAllBtn = document.getElementById("showAll");
+const resetBtn = document.getElementById("resetFilter");
+const filterLabelEl = document.getElementById("filterLabel");
 
 const tabGroups = document.getElementById("tabGroups");
 const tabPlaces = document.getElementById("tabPlaces");
@@ -55,6 +57,39 @@ tabPlaces.onclick = () => {
 function setCount(text) {
   countEl.textContent = text;
 }
+
+// =====================
+// FILTER STATE (for clear UX)
+// =====================
+let currentFilter = null; // { kind: "Title"|"Collection"|"Type"|"Search", label: string }
+
+function setFilterUI(filter) {
+  currentFilter = filter;
+
+  if (!filter) {
+    filterLabelEl.style.display = "none";
+    filterLabelEl.textContent = "";
+    resetBtn.style.display = "none";
+    return;
+  }
+
+  filterLabelEl.style.display = "inline";
+  resetBtn.style.display = "inline-block";
+
+  const label = `${filter.kind}: ${filter.label}`;
+  filterLabelEl.textContent = `Filtered by ${label}`;
+}
+
+function clearFilters() {
+  setFilterUI(null);
+  rebuildCluster(allMarkers);
+  closeResultsModal();
+}
+
+resetBtn.onclick = () => {
+  // Keep whatever search text is there, but reset map filtering to "all"
+  clearFilters();
+};
 
 // =====================
 // RESULTS MODAL
@@ -86,14 +121,49 @@ const mDesc = document.getElementById("mDesc");
 const mGallery = document.getElementById("mGallery");
 const closeBtn = document.getElementById("closeBtn");
 
+function escapeHtml(s) {
+  return (s || "").toString()
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function chipHtml(kind, label) {
+  const k = escapeHtml(kind);
+  const l = escapeHtml(label);
+  return `<span class="chip" role="button" tabindex="0" data-kind="${k}" data-label="${l}">${l}</span>`;
+}
+
 function openLocationModal(loc) {
   mTitle.textContent = loc.title || "";
-  const metaBits = [];
-  if (loc.type) metaBits.push(loc.type);
-  if (loc.series) metaBits.push(`Series: ${loc.series}`);
-  if (Array.isArray(loc.collections) && loc.collections.length) metaBits.push(`Collections: ${loc.collections.join(", ")}`);
 
-  mMeta.textContent = `${loc.place || ""}${loc.country ? " • " + loc.country : ""}${metaBits.length ? " • " + metaBits.join(" • ") : ""}`;
+  // Meta: place/country + clickable chips for type and collections
+  const placeBits = [];
+  if (loc.place) placeBits.push(loc.place);
+  if (loc.country) placeBits.push(loc.country);
+
+  let html = "";
+  if (placeBits.length) {
+    html += `<span class="meta-text">${escapeHtml(placeBits.join(" • "))}</span>`;
+  }
+
+  if (loc.type) {
+    html += chipHtml("Type", loc.type);
+  }
+
+  const cols = Array.isArray(loc.collections) ? loc.collections : [];
+  cols.forEach((c) => {
+    if (c) html += chipHtml("Collection", c);
+  });
+
+  if (loc.series) {
+    html += chipHtml("Title", loc.series);
+  }
+
+  mMeta.innerHTML = html;
+
   mDesc.textContent = loc.description || "";
 
   mGallery.innerHTML = "";
@@ -125,6 +195,15 @@ modal.onclick = (e) => {
   if (e.target === modal) closeLocationModal();
 };
 
+// Clicking chips in the modal applies a filter
+mMeta.addEventListener("click", (e) => {
+  const el = e.target.closest("[data-kind][data-label]");
+  if (!el) return;
+  const kind = el.getAttribute("data-kind");
+  const label = el.getAttribute("data-label");
+  applyGroupFilter(kind, label);
+});
+
 // ESC closes whichever modal is open
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
@@ -141,8 +220,7 @@ let allMarkers = [];
 let fuseLocations;
 let fuseGroups;
 
-// For filtering groups -> markers
-const groupsIndex = new Map(); // key = "Title::X" or "Collection::Y" => Marker[]
+const groupsIndex = new Map(); // "Title::X" | "Collection::Y" | "Type::Z" -> Marker[]
 
 function norm(s) {
   return (s || "").toString().trim();
@@ -157,27 +235,42 @@ function rebuildCluster(markers) {
   setCount(`${markers.length.toLocaleString()} locations shown`);
 }
 
+// Buttons
 function showAll() {
+  searchInput.value = "";
+  setFilterUI(null);
   rebuildCluster(allMarkers);
   closeResultsModal();
 }
+showAllBtn.onclick = showAll;
 
-showAllBtn.onclick = () => {
+// Apply a group filter (called by results + modal chips)
+function applyGroupFilter(kind, label) {
+  // Reset search text since we’re switching to a filter-by-group action
+  // (prevents confusion + meets your “reset then apply one” requirement)
   searchInput.value = "";
-  showAll();
-};
+  closeResultsModal();
 
-function filterGroup(kind, label) {
   const key = `${kind}::${label}`;
   const markers = groupsIndex.get(key) || [];
-  rebuildCluster(markers);
 
-  // Switch to Places tab automatically (better UX)
+  rebuildCluster(markers);
+  setFilterUI({ kind, label });
+}
+
+// When user selects a group from results, we filter + show places list
+function filterGroupAndListPlaces(kind, label) {
+  const key = `${kind}::${label}`;
+  const markers = groupsIndex.get(key) || [];
+
+  rebuildCluster(markers);
+  setFilterUI({ kind, label });
+
+  // Switch to Places tab and list items
   activeTab = "places";
   tabPlaces.classList.add("active");
   tabGroups.classList.remove("active");
 
-  // Keep results modal open and show places list
   openResultsModal();
   resultsEl.innerHTML = "";
 
@@ -192,8 +285,8 @@ function filterGroup(kind, label) {
     const loc = mk.__loc;
     const card = document.createElement("div");
     card.className = "card";
-    card.innerHTML = `<div class="title">${loc.place || "(Unknown place)"}</div>
-                      <div class="meta">${loc.title || ""}${loc.country ? " • " + loc.country : ""}</div>`;
+    card.innerHTML = `<div class="title">${escapeHtml(loc.place || "(Unknown place)")}</div>
+                      <div class="meta">${escapeHtml(loc.title || "")}${loc.country ? " • " + escapeHtml(loc.country) : ""}</div>`;
     card.onclick = () => {
       map.setView([loc.lat, loc.lng], 16);
       openLocationModal(loc);
@@ -213,7 +306,6 @@ function filterGroup(kind, label) {
 function runSearch(raw) {
   const query = norm(raw);
 
-  // Empty => close results modal, don't change map
   if (!query) {
     closeResultsModal();
     return;
@@ -239,9 +331,9 @@ function runSearch(raw) {
       const { kind, label, count } = r.item;
       const card = document.createElement("div");
       card.className = "card";
-      card.innerHTML = `<div class="title">${label}</div>
-                        <div class="meta">${kind} • ${count.toLocaleString()} locations</div>`;
-      card.onclick = () => filterGroup(kind, label);
+      card.innerHTML = `<div class="title">${escapeHtml(label)}</div>
+                        <div class="meta">${escapeHtml(kind)} • ${count.toLocaleString()} locations</div>`;
+      card.onclick = () => filterGroupAndListPlaces(kind, label);
       resultsEl.appendChild(card);
     });
 
@@ -253,6 +345,8 @@ function runSearch(raw) {
 
   if (!locHits.length) {
     rebuildCluster([]);
+    setFilterUI({ kind: "Search", label: query });
+
     const empty = document.createElement("div");
     empty.className = "card";
     empty.style.cursor = "default";
@@ -261,19 +355,20 @@ function runSearch(raw) {
     return;
   }
 
-  // Filter map to hits (cap for performance)
+  // Filter map to hits
   const hitMarkers = locHits
     .slice(0, 2000)
     .map((loc) => loc.__marker)
     .filter(Boolean);
 
   rebuildCluster(hitMarkers);
+  setFilterUI({ kind: "Search", label: query });
 
   locHits.forEach((loc) => {
     const card = document.createElement("div");
     card.className = "card";
-    card.innerHTML = `<div class="title">${loc.place || "(Unknown place)"}</div>
-                      <div class="meta">${loc.title || ""}${loc.country ? " • " + loc.country : ""}</div>`;
+    card.innerHTML = `<div class="title">${escapeHtml(loc.place || "(Unknown place)")}</div>
+                      <div class="meta">${escapeHtml(loc.title || "")}${loc.country ? " • " + escapeHtml(loc.country) : ""}</div>`;
     card.onclick = () => {
       map.setView([loc.lat, loc.lng], 16);
       openLocationModal(loc);
@@ -282,7 +377,7 @@ function runSearch(raw) {
   });
 }
 
-// Search on typing AND Enter/Go
+// Search triggers
 searchInput.addEventListener("input", () => runSearch(searchInput.value));
 searchInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
@@ -301,6 +396,7 @@ fetch("./data/locations.json")
 
     const markersByTitle = new Map();
     const markersByCollection = new Map();
+    const markersByType = new Map();
 
     function addToMapList(mapObj, key, val) {
       const k = norm(key);
@@ -331,11 +427,14 @@ fetch("./data/locations.json")
 
       allMarkers.push(mk);
 
+      // Grouping indexes
       addToMapList(markersByTitle, loc.title, mk);
       loc.collections.forEach((c) => addToMapList(markersByCollection, c, mk));
+      addToMapList(markersByType, loc.type, mk);
     });
 
     rebuildCluster(allMarkers);
+    setFilterUI(null);
 
     // Locations search (lots of fields)
     fuseLocations = new Fuse(ALL, {
@@ -353,7 +452,7 @@ fetch("./data/locations.json")
       ]
     });
 
-    // Groups search (Titles + Collections)
+    // Groups search (Titles + Collections + Types)
     const groups = [];
 
     markersByTitle.forEach((arr, title) => {
@@ -364,6 +463,11 @@ fetch("./data/locations.json")
     markersByCollection.forEach((arr, col) => {
       groups.push({ kind: "Collection", label: col, count: arr.length });
       groupsIndex.set(`Collection::${col}`, arr);
+    });
+
+    markersByType.forEach((arr, type) => {
+      groups.push({ kind: "Type", label: type, count: arr.length });
+      groupsIndex.set(`Type::${type}`, arr);
     });
 
     fuseGroups = new Fuse(groups, {
