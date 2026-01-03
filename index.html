@@ -67,8 +67,17 @@
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <script src="https://unpkg.com/fuse.js@7.0.0/dist/fuse.min.js"></script>
 
-  <!-- CONFIG MUST LOAD BEFORE app.js -->
+  <!-- Config + app modules (order matters) -->
   <script src="config.js"></script>
+
+  <script src="src/state.js"></script>
+  <script src="src/map.js"></script>
+  <script src="src/modal.js"></script>
+  <script src="src/ui.js"></script>
+  <script src="src/search.js"></script>
+  <script src="src/data.js"></script>
+
+  <!-- Boot -->
   <script src="app.js"></script>
 </body>
 </html>
