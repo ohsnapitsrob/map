@@ -26,7 +26,7 @@
     "description": "",
     "keywords": ["Marvel", "Captain America"],
     "aliases": ["First Avenger"],
-    "images": []
+    "images": ["https://images.pixieset.com/792546301/32b0c4e7e6836e7b8081d0ccabccf23a-xlarge.jpg", "https://images.pixieset.com/792546301/21e9114b99fb12ca58b8ad1bd53ca775-xlarge.jpg"]
   },
   {
     "id": "monte-carlo-louvre",
