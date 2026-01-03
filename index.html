@@ -1,1 +1,53 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Locations Map</title>
 
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <h1>On the Map</h1>
+
+      <input id="search" type="search" placeholder="Search title, place, collection, keyword…" autocomplete="off" />
+      <div class="hint">Examples: “James Bond”, “Louvre”, “Red Dwarf”, “Liverpool”</div>
+
+      <div class="row">
+        <button id="showAll" class="btn">Show all</button>
+        <span id="count" class="count"></span>
+      </div>
+
+      <div class="tabs">
+        <button id="tabGroups" class="tab active">Groups</button>
+        <button id="tabPlaces" class="tab">Places</button>
+      </div>
+
+      <div id="results" class="results"></div>
+    </aside>
+
+    <main id="map"></main>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal" class="modal" aria-hidden="true">
+    <div class="modal-card">
+      <button id="closeBtn" class="btn close">Close</button>
+      <h2 id="mTitle"></h2>
+      <p id="mMeta"></p>
+      <p id="mDesc"></p>
+      <div id="mGallery" class="gallery"></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script src="https://unpkg.com/fuse.js@7.0.0/dist/fuse.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
