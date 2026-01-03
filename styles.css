@@ -52,7 +52,7 @@ input[type="search"] {
 .card .meta { font-size: 12px; opacity: .75; margin-top: 4px; }
 
 /* modal */
-.modal { position: fixed; inset: 0; display:none; background: rgba(0,0,0,.6); padding: 18px; }
+.modal { position: fixed; inset: 0; display:none; background: rgba(0,0,0,.6); padding: 18px; z-index: 5000;}
 .modal.open { display:block; }
 .modal-card { background:#fff; max-width: 980px; margin: 6vh auto; padding: 16px; border-radius: 14px; }
 .close { float:right; }
