@@ -1,20 +1,5 @@
 [
   {
-    "id": "red-dwarf-lyme-hall",
-    "title": "Red Dwarf (1988)",
-    "type": "TV",
-    "collections": [],
-    "series": "Red Dwarf",
-    "place": "Lyme Park (Lyme Hall)",
-    "country": "UK",
-    "lat": 53.3380057,
-    "lng": -2.0562457,
-    "description": "",
-    "keywords": ["BBC", "sci-fi", "comedy"],
-    "aliases": [],
-    "images": []
-  },
-  {
     "id": "cap-first-avenger-stanley-dock-liverpool",
     "title": "Captain America: The First Avenger (2011)",
     "type": "Film",
@@ -45,19 +30,5 @@
     "images": [
       "https://images.pixieset.com/792546301/32b0c4e7e6836e7b8081d0ccabccf23a-xlarge.jpg"
     ]
-  },
-  {
-    "id": "monte-carlo-louvre",
-    "title": "Monte Carlo (2011)",
-    "type": "Film",
-    "collections": [],
-    "place": "Louvre, Paris",
-    "country": "France",
-    "lat": 48.860647,
-    "lng": 2.334778,
-    "description": "",
-    "keywords": ["Paris"],
-    "aliases": [],
-    "images": []
   }
 ]
