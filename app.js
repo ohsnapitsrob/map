@@ -1,8 +1,12 @@
-// ====== CONFIG ======
+// =====================
+// CONFIG
+// =====================
 const MAPTILER_KEY = "4iGDVzk2f6BFmiqgFyyU";
-const MAP_STYLE = "streets"; // try: basic, streets, outdoors, etc.
+const MAP_STYLE = "streets";
 
-// ====== MAP ======
+// =====================
+// MAP
+// =====================
 const map = L.map("map", { preferCanvas: true }).setView([54.5, -2.5], 6);
 
 L.tileLayer(
@@ -10,14 +14,15 @@ L.tileLayer(
   { maxZoom: 20, attribution: "&copy; MapTiler & OpenStreetMap contributors" }
 ).addTo(map);
 
-// Cluster for 10K+ (good UX + performance)
 const cluster = L.markerClusterGroup({
   chunkedLoading: true,
   removeOutsideVisibleBounds: true
 });
 map.addLayer(cluster);
 
-// ====== UI ELEMENTS ======
+// =====================
+// UI ELEMENTS
+// =====================
 const searchInput = document.getElementById("search");
 const resultsEl = document.getElementById("results");
 const countEl = document.getElementById("count");
@@ -26,48 +31,65 @@ const showAllBtn = document.getElementById("showAll");
 const tabGroups = document.getElementById("tabGroups");
 const tabPlaces = document.getElementById("tabPlaces");
 
-function setCount(text) { countEl.textContent = text; }
+let activeTab = "groups";
 
-let activeTab = "groups"; // groups | places
-
-tabGroups.addEventListener("click", () => {
+tabGroups.onclick = () => {
   activeTab = "groups";
   tabGroups.classList.add("active");
   tabPlaces.classList.remove("active");
   runSearch(searchInput.value.trim());
-});
+};
 
-tabPlaces.addEventListener("click", () => {
+tabPlaces.onclick = () => {
   activeTab = "places";
   tabPlaces.classList.add("active");
   tabGroups.classList.remove("active");
   runSearch(searchInput.value.trim());
-});
+};
 
-// ====== MODAL ======
+function setCount(text) {
+  countEl.textContent = text;
+}
+
+// =====================
+// RESULTS MODAL
+// =====================
+const resultsModal = document.getElementById("resultsModal");
+const resultsCloseBtn = document.getElementById("resultsCloseBtn");
+
+function openResultsModal() {
+  resultsModal.classList.add("open");
+  resultsModal.setAttribute("aria-hidden", "false");
+}
+function closeResultsModal() {
+  resultsModal.classList.remove("open");
+  resultsModal.setAttribute("aria-hidden", "true");
+}
+
+resultsCloseBtn.onclick = closeResultsModal;
+resultsModal.onclick = (e) => {
+  if (e.target === resultsModal) closeResultsModal();
+};
+
+// =====================
+// LOCATION MODAL
+// =====================
 const modal = document.getElementById("modal");
 const mTitle = document.getElementById("mTitle");
-const mMeta  = document.getElementById("mMeta");
-const mDesc  = document.getElementById("mDesc");
+const mMeta = document.getElementById("mMeta");
+const mDesc = document.getElementById("mDesc");
 const mGallery = document.getElementById("mGallery");
 
 function openModal(loc) {
   mTitle.textContent = loc.title || "";
-  const bits = [];
-  if (loc.type) bits.push(loc.type);
-  if (loc.series) bits.push(`Series: ${loc.series}`);
-  if (loc.collections && loc.collections.length) bits.push(`Collections: ${loc.collections.join(", ")}`);
-  mMeta.textContent = `${loc.place || ""}${loc.country ? " • " + loc.country : ""}${bits.length ? " • " + bits.join(" • ") : ""}`;
+  mMeta.textContent = `${loc.place || ""}${loc.country ? " • " + loc.country : ""}`;
   mDesc.textContent = loc.description || "";
 
   mGallery.innerHTML = "";
-  const imgs = (loc.images || []);
-  if (!imgs.length) {
-    const p = document.createElement("p");
-    p.textContent = "No images yet.";
-    mGallery.appendChild(p);
+  if (!loc.images || !loc.images.length) {
+    mGallery.innerHTML = "<p>No images yet.</p>";
   } else {
-    imgs.forEach((src) => {
+    loc.images.forEach(src => {
       const img = document.createElement("img");
       img.src = src;
       img.loading = "lazy";
@@ -78,262 +100,134 @@ function openModal(loc) {
   modal.classList.add("open");
   modal.setAttribute("aria-hidden", "false");
 }
-function closeModal() {
-  modal.classList.remove("open");
-  modal.setAttribute("aria-hidden", "true");
-}
-document.getElementById("closeBtn").addEventListener("click", closeModal);
-modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
 
-// ====== DATA + INDEXES ======
+document.getElementById("closeBtn").onclick = () => {
+  modal.classList.remove("open");
+};
+
+// =====================
+// DATA + SEARCH
+// =====================
 let ALL = [];
 let allMarkers = [];
-let markersByTitle = new Map();       // title -> markers[]
-let markersByCollection = new Map();  // collection -> markers[]
+let markersByTitle = new Map();
+let markersByCollection = new Map();
+let fuseLocations, fuseGroups;
 
-let fuseLocations; // searches individual locations
-let fuseGroups;    // searches group strings (titles + collections)
+function norm(s) {
+  return (s || "").toString().trim();
+}
 
-function norm(s) { return (s || "").toString().trim(); }
-function safeArr(a) { return Array.isArray(a) ? a : (a ? [a] : []); }
-
-function addToMapList(mapObj, key, val) {
-  const k = norm(key);
-  if (!k) return;
-  if (!mapObj.has(k)) mapObj.set(k, []);
-  mapObj.get(k).push(val);
+function safeArr(a) {
+  return Array.isArray(a) ? a : (a ? [a] : []);
 }
 
 function rebuildCluster(markers) {
   cluster.clearLayers();
   cluster.addLayers(markers);
-  setCount(`${markers.length.toLocaleString()} location(s) shown`);
-  if (markers.length) {
-    const fg = L.featureGroup(markers);
-    map.fitBounds(fg.getBounds(), { padding: [20, 20] });
-  }
+  setCount(`${markers.length.toLocaleString()} locations shown`);
 }
 
 function showAll() {
   rebuildCluster(allMarkers);
-  renderDefaultGroups();
+  closeResultsModal();
 }
 
-showAllBtn.addEventListener("click", () => {
+showAllBtn.onclick = () => {
   searchInput.value = "";
   showAll();
-});
+};
 
-// Build “groups” list for browsing (nice even without searching)
-function renderDefaultGroups() {
-  resultsEl.innerHTML = "";
-  // Show top titles by count (nice browse experience)
-  const titleCounts = Array.from(markersByTitle.entries())
-    .map(([title, markers]) => ({ label: title, kind: "Title", count: markers.length }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 30);
-
-  const collectionCounts = Array.from(markersByCollection.entries())
-    .map(([col, markers]) => ({ label: col, kind: "Collection", count: markers.length }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 30);
-
-  const section = (name) => {
-    const div = document.createElement("div");
-    div.className = "card";
-    div.style.cursor = "default";
-    div.innerHTML = `<div class="title">${name}</div><div class="meta">Click a card to filter the map</div>`;
-    resultsEl.appendChild(div);
-  };
-
-  section("Popular titles");
-  titleCounts.forEach(x => addGroupCard(x.kind, x.label, x.count));
-
-  if (collectionCounts.length) {
-    section("Collections");
-    collectionCounts.forEach(x => addGroupCard(x.kind, x.label, x.count));
-  }
-}
-
-function addGroupCard(kind, label, count) {
-  const card = document.createElement("div");
-  card.className = "card";
-  card.innerHTML = `<div class="title">${label}</div><div class="meta">${kind} • ${count.toLocaleString()} location(s)</div>`;
-  card.addEventListener("click", () => filterByGroup(kind, label));
-  resultsEl.appendChild(card);
-}
-
-function addPlaceCard(loc) {
-  const card = document.createElement("div");
-  card.className = "card";
-  const metaBits = [];
-  if (loc.type) metaBits.push(loc.type);
-  if (loc.country) metaBits.push(loc.country);
-  if (loc.collections && loc.collections.length) metaBits.push(loc.collections.join(", "));
-  card.innerHTML = `<div class="title">${loc.place || "(Unknown place)"}</div>
-                    <div class="meta">${norm(loc.title)}${metaBits.length ? " • " + metaBits.join(" • ") : ""}</div>`;
-  card.addEventListener("click", () => {
-    // zoom + open modal
-    map.setView([loc.lat, loc.lng], 16, { animate: true });
-    openModal(loc);
-  });
-  resultsEl.appendChild(card);
-}
-
-function filterByGroup(kind, label) {
-  let markers = [];
-  if (kind === "Title") markers = markersByTitle.get(label) || [];
-  if (kind === "Collection") markers = markersByCollection.get(label) || [];
-  rebuildCluster(markers);
-
-  resultsEl.innerHTML = "";
-  const header = document.createElement("div");
-  header.className = "card";
-  header.style.cursor = "default";
-  header.innerHTML = `<div class="title">${label}</div><div class="meta">${kind} • ${markers.length.toLocaleString()} location(s)</div>`;
-  resultsEl.appendChild(header);
-
-  // list some places for quick browsing
-  markers.slice(0, 200).forEach(mk => addPlaceCard(mk.__loc));
-  if (markers.length > 200) {
-    const more = document.createElement("div");
-    more.className = "card";
-    more.style.cursor = "default";
-    more.innerHTML = `<div class="meta">Showing first 200 places here. (All are still on the map.)</div>`;
-    resultsEl.appendChild(more);
-  }
-}
-
-// ====== SEARCH ======
 function runSearch(q) {
   const query = norm(q);
-
   if (!query) {
-    if (activeTab === "groups") renderDefaultGroups();
-    else {
-      resultsEl.innerHTML = "";
-      allMarkers.slice(0, 50).forEach(mk => addPlaceCard(mk.__loc));
-      if (allMarkers.length > 50) {
-        const more = document.createElement("div");
-        more.className = "card";
-        more.style.cursor = "default";
-        more.innerHTML = `<div class="meta">Showing 50 random-ish places. Search to find more.</div>`;
-        resultsEl.appendChild(more);
-      }
-    }
+    closeResultsModal();
     return;
   }
+
+  openResultsModal();
+  resultsEl.innerHTML = "";
 
   if (activeTab === "groups") {
-    // Group search: titles + collections
-    const res = fuseGroups.search(query).map(r => r.item);
-    resultsEl.innerHTML = "";
-    res.slice(0, 30).forEach(item => addGroupCard(item.kind, item.label, item.count));
-    if (!res.length) {
-      const empty = document.createElement("div");
-      empty.className = "card";
-      empty.style.cursor = "default";
-      empty.innerHTML = `<div class="title">No matches</div><div class="meta">Try different wording.</div>`;
-      resultsEl.appendChild(empty);
-    }
+    fuseGroups.search(query).slice(0, 30).forEach(r => {
+      const { kind, label, count } = r.item;
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `<div class="title">${label}</div>
+                        <div class="meta">${kind} • ${count} locations</div>`;
+      card.onclick = () => filterGroup(kind, label);
+      resultsEl.appendChild(card);
+    });
     return;
   }
 
-  // Places search: individual locations
-  const locRes = fuseLocations.search(query).map(r => r.item);
-  resultsEl.innerHTML = "";
-  locRes.slice(0, 50).forEach(loc => addPlaceCard(loc));
+  const locs = fuseLocations.search(query).slice(0, 50).map(r => r.item);
+  rebuildCluster(locs.map(l => l.__marker));
 
-  // Filter the map to matched locations (great UX for search)
-  const matchedMarkers = locRes
-    .slice(0, 2000) // safety cap; map still shows clusters if huge
-    .map(loc => loc.__marker)
-    .filter(Boolean);
-
-  rebuildCluster(matchedMarkers);
-
-  if (!locRes.length) {
-    const empty = document.createElement("div");
-    empty.className = "card";
-    empty.style.cursor = "default";
-    empty.innerHTML = `<div class="title">No matches</div><div class="meta">Try searching by collection, country, or a keyword.</div>`;
-    resultsEl.appendChild(empty);
-  }
+  locs.forEach(loc => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `<div class="title">${loc.place}</div>
+                      <div class="meta">${loc.title} • ${loc.country}</div>`;
+    card.onclick = () => {
+      map.setView([loc.lat, loc.lng], 16);
+      openModal(loc);
+    };
+    resultsEl.appendChild(card);
+  });
 }
 
 searchInput.addEventListener("input", () => runSearch(searchInput.value));
 
-// ====== LOAD ======
+// =====================
+// LOAD DATA
+// =====================
 fetch("./data/locations.json")
   .then(r => r.json())
-  .then((data) => {
+  .then(data => {
     ALL = data;
 
-    // Build markers + indexes
-    markersByTitle = new Map();
-    markersByCollection = new Map();
-    allMarkers = [];
-
-    for (const loc of ALL) {
-      // Basic validation
-      if (typeof loc.lat !== "number" || typeof loc.lng !== "number") continue;
-      loc.title = norm(loc.title);
-      loc.place = norm(loc.place);
-      loc.country = norm(loc.country);
-      loc.type = norm(loc.type);
-      loc.collections = safeArr(loc.collections).map(norm).filter(Boolean);
-      loc.keywords = safeArr(loc.keywords).map(norm).filter(Boolean);
-      loc.aliases = safeArr(loc.aliases).map(norm).filter(Boolean);
-      loc.series = norm(loc.series);
-      loc.description = norm(loc.description);
+    ALL.forEach(loc => {
+      if (typeof loc.lat !== "number" || typeof loc.lng !== "number") return;
 
       const mk = L.marker([loc.lat, loc.lng]);
-      mk.__loc = loc;
-      loc.__marker = mk; // link back for search filtering
       mk.on("click", () => openModal(loc));
+      loc.__marker = mk;
 
       allMarkers.push(mk);
 
-      addToMapList(markersByTitle, loc.title, mk);
-      loc.collections.forEach(c => addToMapList(markersByCollection, c, mk));
-    }
+      const title = norm(loc.title);
+      if (title) {
+        if (!markersByTitle.has(title)) markersByTitle.set(title, []);
+        markersByTitle.get(title).push(mk);
+      }
 
-    // Build Fuse index for places (search hits across many fields)
+      safeArr(loc.collections).forEach(c => {
+        if (!markersByCollection.has(c)) markersByCollection.set(c, []);
+        markersByCollection.get(c).push(mk);
+      });
+    });
+
+    rebuildCluster(allMarkers);
+
     fuseLocations = new Fuse(ALL, {
-      includeScore: true,
       threshold: 0.35,
       keys: [
         { name: "title", weight: 3 },
-        { name: "collections", weight: 2.5 },
-        { name: "series", weight: 2 },
-        { name: "aliases", weight: 2 },
+        { name: "collections", weight: 2 },
         { name: "place", weight: 1.7 },
         { name: "country", weight: 1.2 },
-        { name: "type", weight: 1.1 },
         { name: "keywords", weight: 1.4 },
         { name: "description", weight: 0.8 }
       ]
     });
 
-    // Build “group” index (titles + collections with counts)
-    const groupItems = [];
-    for (const [t, arr] of markersByTitle.entries()) groupItems.push({ kind: "Title", label: t, count: arr.length });
-    for (const [c, arr] of markersByCollection.entries()) groupItems.push({ kind: "Collection", label: c, count: arr.length });
+    const groups = [];
+    markersByTitle.forEach((v, k) => groups.push({ kind: "Title", label: k, count: v.length }));
+    markersByCollection.forEach((v, k) => groups.push({ kind: "Collection", label: k, count: v.length }));
 
-    fuseGroups = new Fuse(groupItems, {
-      includeScore: true,
+    fuseGroups = new Fuse(groups, {
       threshold: 0.35,
-      keys: [
-        { name: "label", weight: 3 },
-        { name: "kind", weight: 0.3 }
-      ]
+      keys: ["label"]
     });
-
-    // Initial view
-    rebuildCluster(allMarkers);
-    renderDefaultGroups();
-  })
-  .catch((err) => {
-    console.error(err);
-    alert("Failed to load data/locations.json");
   });
