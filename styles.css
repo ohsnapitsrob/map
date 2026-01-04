@@ -12,9 +12,10 @@ html, body {
   height: 100%;
   margin: 0;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  overflow: hidden;
+  overflow: hidden; /* avoids sideways “wiggle” on mobile focus */
 }
 
+/* Body becomes a column: topbar then map */
 body {
   display: flex;
   flex-direction: column;
@@ -22,7 +23,7 @@ body {
 }
 
 /* ======================
-   TOP BAR
+   TOP BAR (in normal flow)
 ====================== */
 
 .topbar {
@@ -46,12 +47,15 @@ body {
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 12px;
-  font-size: 16px; /* prevents iOS zoom */
+
+  /* iOS Safari will zoom inputs if font-size < 16px */
+  font-size: 16px;
 }
 
 .topbar-actions {
   display: flex;
   gap: 8px;
+  flex: 0 0 auto;
 }
 
 .topbar-meta {
@@ -66,16 +70,22 @@ body {
 .count { white-space: nowrap; }
 
 .filter-label {
+  opacity: 1;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+/* Mobile: stack buttons under input */
 @media (max-width: 520px) {
   .topbar-inner {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .topbar-actions {
+    width: 100%;
   }
 
   .topbar-actions .btn {
@@ -86,16 +96,58 @@ body {
     flex-direction: column;
     align-items: flex-start;
   }
+
+  .filter-label {
+    width: 100%;
+  }
 }
 
 /* ======================
-   MAP
+   MAP (fills remaining space)
 ====================== */
 
 #map {
   flex: 1 1 auto;
   min-height: 0;
   width: 100%;
+}
+
+/* ======================
+   BUTTONS / TABS
+====================== */
+
+.btn {
+  border: 1px solid var(--border);
+  background: #fff;
+  padding: 9px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-secondary {
+  background: #fafafa;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.tab {
+  flex: 1;
+  border: 1px solid var(--border);
+  background: #fff;
+  padding: 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.tab.active {
+  opacity: 1;
+  font-weight: 600;
 }
 
 /* ======================
@@ -114,10 +166,12 @@ body {
   display: block;
 }
 
+/* results modal above everything except location modal */
 #resultsModal {
   z-index: 4500;
 }
 
+/* your kept z-index for the location modal */
 .location-modal {
   z-index: 5000;
 }
@@ -130,8 +184,45 @@ body {
   border-radius: 14px;
 }
 
+@media (max-width: 520px) {
+  .modal-card {
+    max-width: 96vw;
+    margin: 10vh auto;
+  }
+}
+
 .close {
   float: right;
+}
+
+/* ======================
+   RESULTS + CARDS
+====================== */
+
+.results {
+  display: grid;
+  gap: 8px;
+}
+
+.card {
+  border: 1px solid var(--border);
+  padding: 10px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.card:hover {
+  background: #fafafa;
+}
+
+.card .title {
+  font-weight: 600;
+}
+
+.card .meta {
+  font-size: 12px;
+  opacity: 0.75;
+  margin-top: 4px;
 }
 
 /* ======================
@@ -142,6 +233,7 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: center;
   margin-bottom: 8px;
   font-size: 13px;
 }
@@ -152,10 +244,12 @@ body {
 
 .chip {
   border: 1px solid var(--border);
+  background: #fff;
   padding: 6px 10px;
   border-radius: 999px;
   cursor: pointer;
   font-size: 12px;
+  user-select: none;
 }
 
 .chip:hover {
