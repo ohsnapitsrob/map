@@ -29,7 +29,7 @@ App.Modal = (function () {
     closeBtn.onclick = close;
     modal.onclick = (e) => { if (e.target === modal) close(); };
 
-    // Clicking chips applies filter AND closes modal (so user sees results immediately)
+    // Clicking chips applies filter AND closes modal
     mMeta.addEventListener("click", (e) => {
       const el = e.target.closest("[data-kind][data-label]");
       if (!el) return;
@@ -65,16 +65,23 @@ App.Modal = (function () {
     if (loc.series) html += chipHtml("Title", loc.series);
 
     mMeta.innerHTML = html;
-
     mDesc.textContent = loc.description || "";
 
+    // ---- Gallery handling ----
     mGallery.innerHTML = "";
+    mGallery.classList.remove("single");
+
     const imgs = Array.isArray(loc.images) ? loc.images : [];
+
     if (!imgs.length) {
       const p = document.createElement("p");
       p.textContent = "No images yet.";
       mGallery.appendChild(p);
     } else {
+      if (imgs.length === 1) {
+        mGallery.classList.add("single");
+      }
+
       imgs.forEach((src) => {
         const img = document.createElement("img");
         img.src = src;
