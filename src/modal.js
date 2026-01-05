@@ -66,13 +66,11 @@ App.Modal = (function () {
   function open(loc) {
     mTitle.textContent = loc.title || "";
 
-    // Info row (Location + Photo Taken)
     const placeBits = [];
     if (loc.place) placeBits.push(loc.place);
     if (loc.country) placeBits.push(loc.country);
     const where = placeBits.join(", ");
 
-    // Prefer monthShort, fallback to dateFormatted, then rawDate
     const when = loc.monthShort || loc.dateFormatted || loc.rawDate || "";
 
     mInfo.innerHTML = `
@@ -91,7 +89,6 @@ App.Modal = (function () {
       ` : ""}
     `;
 
-    // Description (optional)
     mDesc.textContent = loc.description || "";
     mDesc.style.display = mDesc.textContent ? "block" : "none";
 
@@ -117,12 +114,16 @@ App.Modal = (function () {
     // Tags (below image)
     const chips = [];
 
+    // Always include the exact Title so users can see all locations for it
+    if (loc.title) chips.push(chipHtml("Title", loc.title));
+
+    // ✅ Series now uses its own kind so filtering works
+    if (loc.series && loc.series !== loc.title) chips.push(chipHtml("Series", loc.series));
+
     if (loc.type) chips.push(chipHtml("Type", loc.type));
 
     const cols = Array.isArray(loc.collections) ? loc.collections : [];
     cols.forEach((c) => { if (c) chips.push(chipHtml("Collection", c)); });
-
-    if (loc.series) chips.push(chipHtml("Title", loc.series));
 
     mTags.innerHTML = chips.length ? chips.join("") : `<span class="loc-tags-empty">No tags yet.</span>`;
 
