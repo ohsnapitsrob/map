@@ -3,16 +3,18 @@ window.App = window.App || {};
 App.Data = (function () {
   let ALL = [];
   let allMarkers = [];
-  const groupsIndex = new Map();
+  const groupsIndex = new Map(); // "Kind::Label" -> Marker[]
 
   function norm(s) { return (s || "").toString().trim(); }
 
+  // Split pipe-delimited fields: "A | B | C" -> ["A","B","C"]
   function splitPipe(s) {
     const t = norm(s);
     if (!t) return [];
     return t.split("|").map(x => norm(x)).filter(Boolean);
   }
 
+  // Robust-ish CSV parser (handles quotes + commas inside quotes)
   function parseCSV(text) {
     const rows = [];
     let row = [];
@@ -44,7 +46,7 @@ App.Data = (function () {
         if (c === "\r" && next === "\n") i++;
         row.push(cur);
         cur = "";
-        if (row.length > 1) rows.push(row);
+        if (row.length > 1 || (row.length === 1 && row[0] !== "")) rows.push(row);
         row = [];
         continue;
       }
@@ -53,7 +55,8 @@ App.Data = (function () {
     }
 
     row.push(cur);
-    if (row.length > 1) rows.push(row);
+    if (row.length > 1 || (row.length === 1 && row[0] !== "")) rows.push(row);
+
     return rows;
   }
 
@@ -65,8 +68,11 @@ App.Data = (function () {
     for (let i = 1; i < rows.length; i++) {
       const r = rows[i];
       if (!r || r.every(cell => norm(cell) === "")) continue;
+
       const obj = {};
-      for (let j = 0; j < header.length; j++) obj[header[j]] = (r[j] ?? "");
+      for (let j = 0; j < header.length; j++) {
+        obj[header[j]] = (r[j] ?? "");
+      }
       out.push(obj);
     }
     return out;
@@ -76,9 +82,10 @@ App.Data = (function () {
     const x = norm(t).toLowerCase();
     if (!x) return "Misc";
     if (x === "film" || x === "movie" || x === "movies") return "Film";
-    if (x === "tv" || x === "tv show" || x === "tv shows") return "TV";
+    if (x === "tv" || x === "tv show" || x === "tv shows" || x === "series") return "TV";
     if (x === "music video" || x === "music videos" || x === "mv") return "Music Video";
-    return "Misc";
+    if (x === "misc" || x === "other") return "Misc";
+    return norm(t);
   }
 
   function addToMapList(mapObj, key, val) {
@@ -89,17 +96,19 @@ App.Data = (function () {
   }
 
   // ----------------------
-  // ICONS (50px target size)
+  // ICONS: SVG pin + legible badge text
   // ----------------------
 
   function getBadgeText(type) {
-    if (type === "Film") return "F";
-    if (type === "TV") return "TV";
-    if (type === "Music Video") return "MV";
+    const t = normalizeType(type);
+    if (t === "Film") return "F";
+    if (t === "TV") return "TV";
+    if (t === "Music Video") return "MV";
     return "?";
   }
 
   function badgeFontSize(badge) {
+    // Bigger for single char, slightly smaller for 2 chars
     return badge.length === 1 ? 4.6 : 3.6;
   }
 
@@ -129,7 +138,6 @@ App.Data = (function () {
         </text>
       </svg>
     `;
-
     return "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg);
   }
 
@@ -147,8 +155,6 @@ App.Data = (function () {
 
     return L.icon({
       iconUrl: svgPin(color, badge),
-
-      // 👇 THIS is the key part
       iconSize: [50, 50],
       iconAnchor: [25, 50],
       popupAnchor: [0, -40]
@@ -157,7 +163,7 @@ App.Data = (function () {
 
   async function fetchSheetCSV(url) {
     const r = await fetch(url, { cache: "no-store" });
-    if (!r.ok) throw new Error("Failed to fetch CSV");
+    if (!r.ok) throw new Error(`Failed to fetch CSV: ${url}`);
     return r.text();
   }
 
@@ -167,9 +173,12 @@ App.Data = (function () {
   }
 
   function postProcessRow(row, fallbackType) {
+    // Existing fields used by UI + search
     const loc = {
+      id: norm(row.id),
       title: norm(row.title),
       type: normalizeType(row.type || fallbackType),
+      series: norm(row.series),
       place: norm(row.place),
       country: norm(row.country),
       lat: coerceNumber(row.lat),
@@ -178,11 +187,27 @@ App.Data = (function () {
       collections: splitPipe(row.collections),
       keywords: splitPipe(row.keywords),
       aliases: splitPipe(row.aliases),
-      images: splitPipe(row.images)
+      images: splitPipe(row.images),
+
+      // ✅ New CSV fields (stored for later use; not shown in UI)
+      exportFileName: norm(row["export-file-name"]),
+      imdb: norm(row["imdb"]),
+      rawDate: norm(row["raw-date"]),
+      dateFormatted: norm(row["date-formatted"]),
+      monthShort: norm(row["month-short"])
     };
 
-    if (!loc.title || !loc.place) return null;
+    // Also keep a generic bag of extra columns (future-proof)
+    // Anything new you add to the sheet is still accessible here.
+    loc._raw = row;
+
+    // require coords + basic fields
     if (typeof loc.lat !== "number" || typeof loc.lng !== "number") return null;
+    if (!loc.title || !loc.place) return null;
+
+    // optional nice default: for TV entries, series can default to title
+    if (!loc.series && loc.type === "TV") loc.series = loc.title;
+
     return loc;
   }
 
@@ -190,48 +215,59 @@ App.Data = (function () {
     const cfg = window.APP_CONFIG || {};
     const sheets = cfg.SHEETS || {};
 
-    const sources = [
-      ["Film", sheets.movies],
-      ["TV", sheets.tv],
-      ["Music Video", sheets.music_videos],
-      ["Misc", sheets.misc]
-    ].filter(([, url]) => !!url);
+    const hasSheets =
+      sheets.movies || sheets.tv || sheets.music_videos || sheets.misc;
 
     try {
       let locs = [];
 
-      const texts = await Promise.all(
-        sources.map(([, url]) => fetchSheetCSV(url))
-      );
+      if (hasSheets) {
+        const sources = [
+          ["Film", sheets.movies],
+          ["TV", sheets.tv],
+          ["Music Video", sheets.music_videos],
+          ["Misc", sheets.misc]
+        ].filter(([, url]) => !!url);
 
-      for (let i = 0; i < sources.length; i++) {
-        const [fallbackType] = sources[i];
-        const rows = rowsToObjects(parseCSV(texts[i]));
-        rows.forEach(r => {
-          const loc = postProcessRow(r, fallbackType);
-          if (loc) locs.push(loc);
-        });
+        const texts = await Promise.all(sources.map(([, url]) => fetchSheetCSV(url)));
+
+        for (let i = 0; i < sources.length; i++) {
+          const [fallbackType] = sources[i];
+          const rows = parseCSV(texts[i]);
+          const objs = rowsToObjects(rows);
+          objs.forEach((r) => {
+            const loc = postProcessRow(r, fallbackType);
+            if (loc) locs.push(loc);
+          });
+        }
+      } else {
+        // Fallback: local json
+        const r = await fetch("./data/locations.json");
+        const data = await r.json();
+        locs = data
+          .map((r) => postProcessRow(r, r.type))
+          .filter(Boolean);
       }
 
       ALL = locs;
-      allMarkers = [];
-      groupsIndex.clear();
 
       const markersByTitle = new Map();
       const markersByCollection = new Map();
       const markersByType = new Map();
 
-      ALL.forEach(loc => {
-        const mk = L.marker([loc.lat, loc.lng], {
-          icon: iconForType(loc.type)
-        });
+      allMarkers = [];
+      groupsIndex.clear();
+
+      ALL.forEach((loc) => {
+        const mk = L.marker([loc.lat, loc.lng], { icon: iconForType(loc.type) });
         mk.__loc = loc;
         mk.on("click", () => App.Modal.open(loc));
         loc.__marker = mk;
 
         allMarkers.push(mk);
+
         addToMapList(markersByTitle, loc.title, mk);
-        loc.collections.forEach(c => addToMapList(markersByCollection, c, mk));
+        (loc.collections || []).forEach((c) => addToMapList(markersByCollection, c, mk));
         addToMapList(markersByType, loc.type, mk);
       });
 
@@ -243,11 +279,18 @@ App.Data = (function () {
         keys: [
           { name: "title", weight: 3 },
           { name: "collections", weight: 2.3 },
+          { name: "series", weight: 1.8 },
+          { name: "aliases", weight: 1.8 },
           { name: "place", weight: 1.7 },
           { name: "country", weight: 1.2 },
           { name: "type", weight: 1.1 },
           { name: "keywords", weight: 1.4 },
-          { name: "description", weight: 0.8 }
+          { name: "description", weight: 0.8 },
+
+          // ✅ Extra fields can also be searchable later if you want:
+          // { name: "imdb", weight: 0.6 },
+          // { name: "dateFormatted", weight: 0.2 },
+          // { name: "monthShort", weight: 0.2 }
         ]
       });
 
@@ -281,7 +324,7 @@ App.Data = (function () {
       });
     } catch (err) {
       console.error(err);
-      alert("Failed to load data");
+      alert("Failed to load data. Check console for details.");
     }
   }
 
