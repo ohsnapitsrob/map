@@ -96,7 +96,7 @@ App.Data = (function () {
   }
 
   // ----------------------
-  // ICONS: SVG pin + legible badge text
+  // ICONS: SVG pin + legible badge text (50px)
   // ----------------------
 
   function getBadgeText(type) {
@@ -108,7 +108,6 @@ App.Data = (function () {
   }
 
   function badgeFontSize(badge) {
-    // Bigger for single char, slightly smaller for 2 chars
     return badge.length === 1 ? 4.6 : 3.6;
   }
 
@@ -173,7 +172,6 @@ App.Data = (function () {
   }
 
   function postProcessRow(row, fallbackType) {
-    // Existing fields used by UI + search
     const loc = {
       id: norm(row.id),
       title: norm(row.title),
@@ -189,7 +187,7 @@ App.Data = (function () {
       aliases: splitPipe(row.aliases),
       images: splitPipe(row.images),
 
-      // ✅ New CSV fields (stored for later use; not shown in UI)
+      // extra CSV fields stored for later
       exportFileName: norm(row["export-file-name"]),
       imdb: norm(row["imdb"]),
       rawDate: norm(row["raw-date"]),
@@ -197,15 +195,12 @@ App.Data = (function () {
       monthShort: norm(row["month-short"])
     };
 
-    // Also keep a generic bag of extra columns (future-proof)
-    // Anything new you add to the sheet is still accessible here.
     loc._raw = row;
 
-    // require coords + basic fields
     if (typeof loc.lat !== "number" || typeof loc.lng !== "number") return null;
     if (!loc.title || !loc.place) return null;
 
-    // optional nice default: for TV entries, series can default to title
+    // nice default for TV rows where series is blank
     if (!loc.series && loc.type === "TV") loc.series = loc.title;
 
     return loc;
@@ -241,17 +236,15 @@ App.Data = (function () {
           });
         }
       } else {
-        // Fallback: local json
         const r = await fetch("./data/locations.json");
         const data = await r.json();
-        locs = data
-          .map((r) => postProcessRow(r, r.type))
-          .filter(Boolean);
+        locs = data.map((r) => postProcessRow(r, r.type)).filter(Boolean);
       }
 
       ALL = locs;
 
       const markersByTitle = new Map();
+      const markersBySeries = new Map();      // ✅ NEW
       const markersByCollection = new Map();
       const markersByType = new Map();
 
@@ -267,6 +260,7 @@ App.Data = (function () {
         allMarkers.push(mk);
 
         addToMapList(markersByTitle, loc.title, mk);
+        addToMapList(markersBySeries, loc.series, mk); // ✅ NEW
         (loc.collections || []).forEach((c) => addToMapList(markersByCollection, c, mk));
         addToMapList(markersByType, loc.type, mk);
       });
@@ -285,12 +279,7 @@ App.Data = (function () {
           { name: "country", weight: 1.2 },
           { name: "type", weight: 1.1 },
           { name: "keywords", weight: 1.4 },
-          { name: "description", weight: 0.8 },
-
-          // ✅ Extra fields can also be searchable later if you want:
-          // { name: "imdb", weight: 0.6 },
-          // { name: "dateFormatted", weight: 0.2 },
-          // { name: "monthShort", weight: 0.2 }
+          { name: "description", weight: 0.8 }
         ]
       });
 
@@ -299,6 +288,12 @@ App.Data = (function () {
       markersByTitle.forEach((arr, title) => {
         groups.push({ kind: "Title", label: title, count: arr.length });
         groupsIndex.set(`Title::${title}`, arr);
+      });
+
+      // ✅ NEW: Series groups
+      markersBySeries.forEach((arr, series) => {
+        groups.push({ kind: "Series", label: series, count: arr.length });
+        groupsIndex.set(`Series::${series}`, arr);
       });
 
       markersByCollection.forEach((arr, col) => {
