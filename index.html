@@ -52,14 +52,27 @@
     </div>
   </div>
 
-  <!-- LOCATION MODAL -->
+  <!-- LOCATION MODAL (updated layout) -->
   <div id="modal" class="modal location-modal" aria-hidden="true">
-    <div class="modal-card">
+    <div class="modal-card modal-card-location">
       <button id="closeBtn" class="btn close">Close</button>
-      <h2 id="mTitle"></h2>
-      <div id="mMeta" class="modal-meta"></div>
-      <p id="mDesc"></p>
+
+      <h2 id="mTitle" class="loc-title"></h2>
+
+      <!-- NEW: location + taken date row -->
+      <div id="mInfo" class="loc-info"></div>
+
+      <!-- Optional description (kept) -->
+      <p id="mDesc" class="loc-desc"></p>
+
+      <!-- Images -->
       <div id="mGallery" class="gallery"></div>
+
+      <!-- NEW: chips below image -->
+      <div class="loc-tags-wrap">
+        <div class="loc-tags-label">See more like this:</div>
+        <div id="mTags" class="loc-tags"></div>
+      </div>
     </div>
   </div>
 
