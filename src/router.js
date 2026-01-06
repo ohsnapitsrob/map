@@ -25,7 +25,6 @@ App.Router = (function () {
     mapReady = !!map;
     if (!mapReady) return;
 
-    // apply any pending URL state once map exists
     if (pendingState) {
       applyState(pendingState);
       pendingState = null;
@@ -79,12 +78,14 @@ App.Router = (function () {
     const params = new URLSearchParams(window.location.search);
 
     const q = params.get("q") || "";
-    const tab = params.get("tab") || "";
+    const tabRaw = params.get("tab") || "";
+    const tab = (tabRaw === "places") ? "places" : "groups"; // ✅ default groups if missing
+
     const fk = params.get("fk") || "";
     const fl = params.get("fl") || "";
     const loc = params.get("loc") || "";
 
-    const rm = params.get("rm") === "1"; // ✅ results modal open/closed
+    const rm = params.get("rm") === "1";
 
     const mlat = params.get("mlat");
     const mlng = params.get("mlng");
@@ -102,12 +103,15 @@ App.Router = (function () {
     const params = new URLSearchParams();
 
     if (state.q) params.set("q", state.q);
-    if (state.tab) params.set("tab", state.tab);
+
+    // ✅ Only store tab if it’s NOT the default
+    if (state.tab === "places") params.set("tab", "places");
+
     if (state.fk) params.set("fk", state.fk);
     if (state.fl) params.set("fl", state.fl);
     if (state.loc) params.set("loc", state.loc);
 
-    if (state.rm) params.set("rm", "1"); // ✅
+    if (state.rm) params.set("rm", "1");
 
     if (Number.isFinite(state.mlat)) params.set("mlat", String(state.mlat));
     if (Number.isFinite(state.mlng)) params.set("mlng", String(state.mlng));
@@ -125,8 +129,7 @@ App.Router = (function () {
   }
 
   function applyFromUrl() {
-    const st = readUrlState();
-    applyState(st);
+    applyState(readUrlState());
   }
 
   function applyState(state) {
@@ -139,17 +142,13 @@ App.Router = (function () {
         lastMapSig = `${round(state.mlat, 5)},${round(state.mlng, 5)},${Math.round(state.mz)}`;
       }
 
-      // If data not ready, stop here (it will re-apply on setLocationsIndex)
       if (!dataReady) return;
 
-      // 1) Tab (defaults to groups)
-      if (state.tab === "places" || state.tab === "groups") {
-        App.Search.setActiveTab(state.tab, { skipUrl: true });
-      }
+      // 1) Tab
+      App.Search.setActiveTab(state.tab, { skipUrl: true });
 
-      // 2) Apply filter/search/default, controlling whether results modal is open
+      // 2) Filter/search/default
       if (state.fk && state.fl) {
-        // If rm=1 and tab=places, show the places list for that group (like clicking a group result)
         if (state.rm && state.tab === "places") {
           App.Search.filterGroupAndListPlaces(state.fk, state.fl, { skipUrl: true, openResultsModal: true });
         } else {
@@ -163,7 +162,7 @@ App.Router = (function () {
         App.Search.resetAll({ skipUrl: true });
       }
 
-      // 3) Ensure results modal matches rm if no search just ran
+      // 3) Results modal state (if no search just opened it)
       if (!state.q && !(state.fk && state.fl && state.tab === "places")) {
         if (state.rm) App.UI.openResultsModal({ skipUrl: true });
         else App.UI.closeResultsModal({ skipUrl: true });
@@ -171,15 +170,14 @@ App.Router = (function () {
 
       // 4) Location modal
       if (state.loc && locationsById.has(state.loc)) {
-        const locObj = locationsById.get(state.loc);
-        App.Modal.open(locObj, { skipUrl: true });
+        App.Modal.open(locationsById.get(state.loc), { skipUrl: true });
       }
     } finally {
       applyingFromUrl = false;
     }
   }
 
-  // ---- Public API used by Search + Modal + UI ----
+  // ---- callbacks ----
 
   function onSearchChanged({ q, tab }) {
     if (applyingFromUrl) return;
@@ -187,10 +185,10 @@ App.Router = (function () {
     const st = readUrlState();
     writeUrlState({
       q: q || "",
-      tab: tab || "",
+      tab: tab || "groups",
       fk: "", fl: "",
       loc: st.loc || "",
-      rm: st.rm, // keep open/closed state
+      rm: st.rm,
       mlat: st.mlat, mlng: st.mlng, mz: st.mz
     }, { push: false });
   }
@@ -201,11 +199,11 @@ App.Router = (function () {
     const st = readUrlState();
     writeUrlState({
       q: "",
-      tab: st.tab || "",
+      tab: st.tab || "groups",
       fk: kind || "",
       fl: label || "",
       loc: "",
-      rm: st.rm, // keep results open/closed
+      rm: st.rm,
       mlat: st.mlat, mlng: st.mlng, mz: st.mz
     }, { push: true });
   }
@@ -215,8 +213,8 @@ App.Router = (function () {
 
     const st = readUrlState();
     writeUrlState({
-      q: "", tab: "", fk: "", fl: "", loc: "",
-      rm: false, // reset closes results modal
+      q: "", tab: "groups", fk: "", fl: "", loc: "",
+      rm: false,
       mlat: st.mlat, mlng: st.mlng, mz: st.mz
     }, { push: true });
   }
@@ -227,7 +225,7 @@ App.Router = (function () {
     const st = readUrlState();
     writeUrlState({
       q: st.q || "",
-      tab: st.tab || "",
+      tab: st.tab || "groups",
       fk: st.fk || "",
       fl: st.fl || "",
       loc: id || "",
@@ -242,7 +240,7 @@ App.Router = (function () {
     const st = readUrlState();
     writeUrlState({
       q: st.q || "",
-      tab: st.tab || "",
+      tab: st.tab || "groups",
       fk: st.fk || "",
       fl: st.fl || "",
       loc: "",
@@ -257,7 +255,7 @@ App.Router = (function () {
     const st = readUrlState();
     writeUrlState({
       q: st.q || "",
-      tab: st.tab || "",
+      tab: st.tab || "groups",
       fk: st.fk || "",
       fl: st.fl || "",
       loc: st.loc || "",
