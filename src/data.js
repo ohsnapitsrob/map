@@ -7,14 +7,12 @@ App.Data = (function () {
 
   function norm(s) { return (s || "").toString().trim(); }
 
-  // Split pipe-delimited fields: "A | B | C" -> ["A","B","C"]
   function splitPipe(s) {
     const t = norm(s);
     if (!t) return [];
     return t.split("|").map(x => norm(x)).filter(Boolean);
   }
 
-  // Robust-ish CSV parser (handles quotes + commas inside quotes)
   function parseCSV(text) {
     const rows = [];
     let row = [];
@@ -56,7 +54,6 @@ App.Data = (function () {
 
     row.push(cur);
     if (row.length > 1 || (row.length === 1 && row[0] !== "")) rows.push(row);
-
     return rows;
   }
 
@@ -70,9 +67,7 @@ App.Data = (function () {
       if (!r || r.every(cell => norm(cell) === "")) continue;
 
       const obj = {};
-      for (let j = 0; j < header.length; j++) {
-        obj[header[j]] = (r[j] ?? "");
-      }
+      for (let j = 0; j < header.length; j++) obj[header[j]] = (r[j] ?? "");
       out.push(obj);
     }
     return out;
@@ -95,10 +90,7 @@ App.Data = (function () {
     mapObj.get(k).push(val);
   }
 
-  // ----------------------
-  // ICONS: SVG pin + legible badge text (50px)
-  // ----------------------
-
+  // ICONS
   function getBadgeText(type) {
     const t = normalizeType(type);
     if (t === "Film") return "F";
@@ -113,30 +105,19 @@ App.Data = (function () {
 
   function svgPin(color, badge) {
     const fs = badgeFontSize(badge);
-
     const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg"
-           width="50" height="50"
-           viewBox="0 0 24 24">
+      <svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 24 24">
         <path fill="${color}"
-          d="M12 2c-3.314 0-6 2.686-6 6
-             c0 4.5 6 14 6 14s6-9.5 6-14
-             c0-3.314-2.686-6-6-6z"/>
+          d="M12 2c-3.314 0-6 2.686-6 6c0 4.5 6 14 6 14s6-9.5 6-14c0-3.314-2.686-6-6-6z"/>
         <circle cx="12" cy="8" r="4.2" fill="white"/>
         <text x="12" y="8.4"
-              text-anchor="middle"
-              dominant-baseline="middle"
-              font-size="${fs}"
-              font-weight="800"
+              text-anchor="middle" dominant-baseline="middle"
+              font-size="${fs}" font-weight="800"
               font-family="system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif"
-              fill="#111827"
-              stroke="white"
-              stroke-width="0.7"
-              paint-order="stroke">
+              fill="#111827" stroke="white" stroke-width="0.7" paint-order="stroke">
           ${badge}
         </text>
-      </svg>
-    `;
+      </svg>`;
     return "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg);
   }
 
@@ -148,7 +129,6 @@ App.Data = (function () {
       "Music Video": "#db2777",
       Misc: "#6b7280"
     };
-
     const badge = getBadgeText(t);
     const color = colors[t] || colors.Misc;
 
@@ -198,11 +178,9 @@ App.Data = (function () {
     loc._raw = row;
 
     if (typeof loc.lat !== "number" || typeof loc.lng !== "number") return null;
-    if (!loc.title || !loc.place) return null;
+    if (!loc.id || !loc.title || !loc.place) return null;
 
-    // nice default for TV rows where series is blank
     if (!loc.series && loc.type === "TV") loc.series = loc.title;
-
     return loc;
   }
 
@@ -210,8 +188,7 @@ App.Data = (function () {
     const cfg = window.APP_CONFIG || {};
     const sheets = cfg.SHEETS || {};
 
-    const hasSheets =
-      sheets.movies || sheets.tv || sheets.music_videos || sheets.misc;
+    const hasSheets = sheets.movies || sheets.tv || sheets.music_videos || sheets.misc;
 
     try {
       let locs = [];
@@ -228,9 +205,8 @@ App.Data = (function () {
 
         for (let i = 0; i < sources.length; i++) {
           const [fallbackType] = sources[i];
-          const rows = parseCSV(texts[i]);
-          const objs = rowsToObjects(rows);
-          objs.forEach((r) => {
+          const rows = rowsToObjects(parseCSV(texts[i]));
+          rows.forEach((r) => {
             const loc = postProcessRow(r, fallbackType);
             if (loc) locs.push(loc);
           });
@@ -243,8 +219,11 @@ App.Data = (function () {
 
       ALL = locs;
 
+      // ✅ Let Router open modals via ?loc=...
+      App.Router.setLocationsIndex(ALL);
+
       const markersByTitle = new Map();
-      const markersBySeries = new Map();      // ✅ NEW
+      const markersBySeries = new Map();
       const markersByCollection = new Map();
       const markersByType = new Map();
 
@@ -260,7 +239,7 @@ App.Data = (function () {
         allMarkers.push(mk);
 
         addToMapList(markersByTitle, loc.title, mk);
-        addToMapList(markersBySeries, loc.series, mk); // ✅ NEW
+        addToMapList(markersBySeries, loc.series, mk);
         (loc.collections || []).forEach((c) => addToMapList(markersByCollection, c, mk));
         addToMapList(markersByType, loc.type, mk);
       });
@@ -290,7 +269,6 @@ App.Data = (function () {
         groupsIndex.set(`Title::${title}`, arr);
       });
 
-      // ✅ NEW: Series groups
       markersBySeries.forEach((arr, series) => {
         groups.push({ kind: "Series", label: series, count: arr.length });
         groupsIndex.set(`Series::${series}`, arr);
