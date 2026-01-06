@@ -1,7 +1,7 @@
 window.App = window.App || {};
 
 App.UI = (function () {
-  let searchInput, resultsEl, countEl, showAllBtn, resetBtn, filterLabelEl;
+  let searchInput, resultsEl, countEl, resetBtn, filterLabelEl;
   let resultsModal, resultsCloseBtn;
   let tabGroups, tabPlaces;
 
@@ -9,7 +9,6 @@ App.UI = (function () {
     searchInput = document.getElementById("search");
     resultsEl = document.getElementById("results");
     countEl = document.getElementById("count");
-    showAllBtn = document.getElementById("showAll");
     resetBtn = document.getElementById("resetFilter");
     filterLabelEl = document.getElementById("filterLabel");
 
@@ -22,16 +21,12 @@ App.UI = (function () {
     resultsCloseBtn.onclick = closeResultsModal;
     resultsModal.onclick = (e) => { if (e.target === resultsModal) closeResultsModal(); };
 
-    // Buttons
-    showAllBtn.onclick = () => App.Search.showAll();
-    resetBtn.onclick = () => App.Search.resetOnly();
+    resetBtn.onclick = () => App.Search.resetAll();
 
-    // ESC closes results modal
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && resultsModal.classList.contains("open")) closeResultsModal();
     });
 
-    // Tabs
     tabGroups.onclick = () => App.Search.setActiveTab("groups");
     tabPlaces.onclick = () => App.Search.setActiveTab("places");
   }
@@ -93,11 +88,7 @@ App.UI = (function () {
   function renderGroupResults(items) {
     clearResults();
     if (!items.length) {
-      addCard({
-        title: "No matches",
-        meta: "Try a different search.",
-        cursorDefault: true
-      });
+      addCard({ title: "No matches", meta: "Try a different search.", cursorDefault: true });
       return;
     }
 
@@ -113,11 +104,7 @@ App.UI = (function () {
   function renderPlaceResults(locs) {
     clearResults();
     if (!locs.length) {
-      addCard({
-        title: "No matches",
-        meta: "Try a collection, country, or keyword.",
-        cursorDefault: true
-      });
+      addCard({ title: "No matches", meta: "Try a collection, country, or keyword.", cursorDefault: true });
       return;
     }
 
@@ -126,7 +113,6 @@ App.UI = (function () {
         title: App.Modal.escapeHtml(loc.place || "(Unknown place)"),
         meta: `${App.Modal.escapeHtml(loc.title || "")}${loc.country ? " • " + App.Modal.escapeHtml(loc.country) : ""}`,
         onClick: () => {
-          // Close results modal before opening location modal (so it doesn't sit behind)
           closeResultsModal();
           App.Map.getMap().setView([loc.lat, loc.lng], 16);
           App.Modal.open(loc);
@@ -150,7 +136,6 @@ App.UI = (function () {
         title: App.Modal.escapeHtml(loc.place || "(Unknown place)"),
         meta: `${App.Modal.escapeHtml(loc.title || "")}${loc.country ? " • " + App.Modal.escapeHtml(loc.country) : ""}`,
         onClick: () => {
-          // Close results modal before opening location modal
           closeResultsModal();
           App.Map.getMap().setView([loc.lat, loc.lng], 16);
           App.Modal.open(loc);
