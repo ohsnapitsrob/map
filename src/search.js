@@ -18,7 +18,7 @@ App.Search = (function () {
       }
     });
 
-    // ✅ IMPORTANT: set default tab without touching URL
+    // default tab without writing URL
     setActiveTab("groups", { skipUrl: true });
   }
 
@@ -27,6 +27,11 @@ App.Search = (function () {
     fuseGroups = fuseGrp;
     groupsIndex = groupsIdx;
     allMarkers = allMk;
+
+    // ✅ NEW: tell router "you can safely apply URL searches now"
+    if (App.Router && typeof App.Router.setSearchReady === "function") {
+      App.Router.setSearchReady();
+    }
   }
 
   function setActiveTab(which, opts = {}) {
@@ -49,7 +54,7 @@ App.Search = (function () {
 
     App.State.clearFilter();
     App.Map.rebuildCluster(allMarkers);
-    App.UI.closeResultsModal({ skipUrl: true }); // reset closes results
+    App.UI.closeResultsModal({ skipUrl: true });
     App.Modal.close?.();
 
     if (!opts.skipUrl) App.Router.onReset();
@@ -72,7 +77,6 @@ App.Search = (function () {
 
   function filterGroupAndListPlaces(kind, label, opts = {}) {
     applyGroupFilter(kind, label, { ...opts, keepSearch: true });
-
     setActiveTab("places", opts);
 
     const key = `${kind}::${label}`;
