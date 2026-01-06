@@ -14,20 +14,18 @@ App.Router = (function () {
 
   function init() {
     window.addEventListener("popstate", () => {
-      applyFromUrl(); // back/forward restores state
+      applyFromUrl();
     });
 
-    // Initial parse (may apply later once data/map are ready)
     pendingState = readUrlState();
   }
 
   function setMap(leafletMap) {
     map = leafletMap;
     mapReady = !!map;
-
     if (!mapReady) return;
 
-    // Apply initial state once map is ready (if pending)
+    // apply any pending URL state once map exists
     if (pendingState) {
       applyState(pendingState);
       pendingState = null;
@@ -35,17 +33,14 @@ App.Router = (function () {
       applyFromUrl();
     }
 
-    // Listen for map changes -> URL
     map.on("moveend zoomend", () => {
       if (applyingFromUrl) return;
 
-      // Debounce so we don't spam history while user pans/zooms
       if (mapDebounce) clearTimeout(mapDebounce);
       mapDebounce = setTimeout(() => {
         const c = map.getCenter();
         const z = map.getZoom();
 
-        // Keep URLs neat/stable with sensible rounding
         const mlat = round(c.lat, 5);
         const mlng = round(c.lng, 5);
         const mz = Math.round(z);
@@ -67,7 +62,6 @@ App.Router = (function () {
 
     dataReady = true;
 
-    // Apply pending once we have data (and map if possible)
     if (pendingState) {
       applyState(pendingState);
       pendingState = null;
@@ -90,12 +84,14 @@ App.Router = (function () {
     const fl = params.get("fl") || "";
     const loc = params.get("loc") || "";
 
+    const rm = params.get("rm") === "1"; // ✅ results modal open/closed
+
     const mlat = params.get("mlat");
     const mlng = params.get("mlng");
     const mz = params.get("mz");
 
     return {
-      q, tab, fk, fl, loc,
+      q, tab, fk, fl, loc, rm,
       mlat: mlat !== null ? Number(mlat) : null,
       mlng: mlng !== null ? Number(mlng) : null,
       mz: mz !== null ? Number(mz) : null
@@ -110,6 +106,8 @@ App.Router = (function () {
     if (state.fk) params.set("fk", state.fk);
     if (state.fl) params.set("fl", state.fl);
     if (state.loc) params.set("loc", state.loc);
+
+    if (state.rm) params.set("rm", "1"); // ✅
 
     if (Number.isFinite(state.mlat)) params.set("mlat", String(state.mlat));
     if (Number.isFinite(state.mlng)) params.set("mlng", String(state.mlng));
@@ -127,42 +125,51 @@ App.Router = (function () {
   }
 
   function applyFromUrl() {
-    // we can apply map view even if data not ready
     const st = readUrlState();
     applyState(st);
   }
 
   function applyState(state) {
-    // Don't do anything until we have at least the map for map view, and data for filters/modals
     applyingFromUrl = true;
 
     try {
-      // 0) Map view first (so UI opens at correct place)
+      // 0) Map view first
       if (mapReady && Number.isFinite(state.mlat) && Number.isFinite(state.mlng) && Number.isFinite(state.mz)) {
         map.setView([state.mlat, state.mlng], state.mz, { animate: false });
-        lastMapSig = `${round(state.mlat,5)},${round(state.mlng,5)},${Math.round(state.mz)}`;
+        lastMapSig = `${round(state.mlat, 5)},${round(state.mlng, 5)},${Math.round(state.mz)}`;
       }
 
-      // If data isn't ready yet, stop here — pendingState is handled by setLocationsIndex()
+      // If data not ready, stop here (it will re-apply on setLocationsIndex)
       if (!dataReady) return;
 
-      // 1) Tab
+      // 1) Tab (defaults to groups)
       if (state.tab === "places" || state.tab === "groups") {
         App.Search.setActiveTab(state.tab, { skipUrl: true });
       }
 
-      // 2) Filter OR search OR default
+      // 2) Apply filter/search/default, controlling whether results modal is open
       if (state.fk && state.fl) {
-        App.Search.applyGroupFilter(state.fk, state.fl, { skipUrl: true, keepSearch: true });
+        // If rm=1 and tab=places, show the places list for that group (like clicking a group result)
+        if (state.rm && state.tab === "places") {
+          App.Search.filterGroupAndListPlaces(state.fk, state.fl, { skipUrl: true, openResultsModal: true });
+        } else {
+          App.Search.applyGroupFilter(state.fk, state.fl, { skipUrl: true, keepSearch: true });
+        }
       } else if (state.q) {
         const input = App.UI.getSearchInput();
         input.value = state.q;
-        App.Search.runSearch(state.q, { skipUrl: true });
+        App.Search.runSearch(state.q, { skipUrl: true, openResultsModal: state.rm });
       } else {
         App.Search.resetAll({ skipUrl: true });
       }
 
-      // 3) Location modal
+      // 3) Ensure results modal matches rm if no search just ran
+      if (!state.q && !(state.fk && state.fl && state.tab === "places")) {
+        if (state.rm) App.UI.openResultsModal({ skipUrl: true });
+        else App.UI.closeResultsModal({ skipUrl: true });
+      }
+
+      // 4) Location modal
       if (state.loc && locationsById.has(state.loc)) {
         const locObj = locationsById.get(state.loc);
         App.Modal.open(locObj, { skipUrl: true });
@@ -172,7 +179,7 @@ App.Router = (function () {
     }
   }
 
-  // ---- Public API used by Search + Modal ----
+  // ---- Public API used by Search + Modal + UI ----
 
   function onSearchChanged({ q, tab }) {
     if (applyingFromUrl) return;
@@ -183,6 +190,7 @@ App.Router = (function () {
       tab: tab || "",
       fk: "", fl: "",
       loc: st.loc || "",
+      rm: st.rm, // keep open/closed state
       mlat: st.mlat, mlng: st.mlng, mz: st.mz
     }, { push: false });
   }
@@ -193,10 +201,11 @@ App.Router = (function () {
     const st = readUrlState();
     writeUrlState({
       q: "",
-      tab: "",
+      tab: st.tab || "",
       fk: kind || "",
       fl: label || "",
       loc: "",
+      rm: st.rm, // keep results open/closed
       mlat: st.mlat, mlng: st.mlng, mz: st.mz
     }, { push: true });
   }
@@ -205,9 +214,9 @@ App.Router = (function () {
     if (applyingFromUrl) return;
 
     const st = readUrlState();
-    // Keep map view on reset (feels nicer)
     writeUrlState({
       q: "", tab: "", fk: "", fl: "", loc: "",
+      rm: false, // reset closes results modal
       mlat: st.mlat, mlng: st.mlng, mz: st.mz
     }, { push: true });
   }
@@ -222,6 +231,7 @@ App.Router = (function () {
       fk: st.fk || "",
       fl: st.fl || "",
       loc: id || "",
+      rm: st.rm,
       mlat: st.mlat, mlng: st.mlng, mz: st.mz
     }, { push: true });
   }
@@ -236,6 +246,7 @@ App.Router = (function () {
       fk: st.fk || "",
       fl: st.fl || "",
       loc: "",
+      rm: st.rm,
       mlat: st.mlat, mlng: st.mlng, mz: st.mz
     }, { push: false });
   }
@@ -250,8 +261,25 @@ App.Router = (function () {
       fk: st.fk || "",
       fl: st.fl || "",
       loc: st.loc || "",
+      rm: st.rm,
       mlat, mlng, mz
     }, { push: false });
+  }
+
+  function onResultsModalOpened() {
+    if (applyingFromUrl) return;
+
+    const st = readUrlState();
+    if (st.rm) return;
+    writeUrlState({ ...st, rm: true }, { push: false });
+  }
+
+  function onResultsModalClosed() {
+    if (applyingFromUrl) return;
+
+    const st = readUrlState();
+    if (!st.rm) return;
+    writeUrlState({ ...st, rm: false }, { push: false });
   }
 
   function isApplyingFromUrl() {
@@ -268,6 +296,8 @@ App.Router = (function () {
     onLocationOpened,
     onLocationClosed,
     onMapViewChanged,
+    onResultsModalOpened,
+    onResultsModalClosed,
     isApplyingFromUrl
   };
 })();
