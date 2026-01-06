@@ -18,7 +18,7 @@ App.UI = (function () {
     tabGroups = document.getElementById("tabGroups");
     tabPlaces = document.getElementById("tabPlaces");
 
-    resultsCloseBtn.onclick = closeResultsModal;
+    resultsCloseBtn.onclick = () => closeResultsModal();
     resultsModal.onclick = (e) => { if (e.target === resultsModal) closeResultsModal(); };
 
     resetBtn.onclick = () => App.Search.resetAll();
@@ -52,14 +52,18 @@ App.UI = (function () {
     filterLabelEl.textContent = `Filtered by ${filter.kind}: ${filter.label}`;
   }
 
-  function openResultsModal() {
+  function openResultsModal(opts = {}) {
     resultsModal.classList.add("open");
     resultsModal.setAttribute("aria-hidden", "false");
+
+    if (!opts.skipUrl) App.Router.onResultsModalOpened();
   }
 
-  function closeResultsModal() {
+  function closeResultsModal(opts = {}) {
     resultsModal.classList.remove("open");
     resultsModal.setAttribute("aria-hidden", "true");
+
+    if (!opts.skipUrl) App.Router.onResultsModalClosed();
   }
 
   function clearResults() {
