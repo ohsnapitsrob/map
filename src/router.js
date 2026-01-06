@@ -3,6 +3,7 @@ window.App = window.App || {};
 App.Router = (function () {
   let locationsById = new Map();
   let dataReady = false;
+  let uiReady = false;
 
   let applyingFromUrl = false;
   let pendingState = null;
@@ -14,43 +15,50 @@ App.Router = (function () {
 
   function init() {
     window.addEventListener("popstate", () => {
-      applyFromUrl();
+      // Back/forward should restore state, but only once ready
+      const st = readUrlState();
+      pendingState = st;
+      tryApplyPending();
     });
 
+    // Capture initial state; apply once ready
     pendingState = readUrlState();
+  }
+
+  function setUiReady() {
+    uiReady = true;
+    tryApplyPending();
   }
 
   function setMap(leafletMap) {
     map = leafletMap;
     mapReady = !!map;
-    if (!mapReady) return;
 
-    if (pendingState) {
-      applyState(pendingState);
-      pendingState = null;
-    } else {
-      applyFromUrl();
+    if (mapReady) {
+      // Listen for map changes -> URL
+      map.on("moveend zoomend", () => {
+        if (applyingFromUrl) return;
+
+        if (mapDebounce) clearTimeout(mapDebounce);
+        mapDebounce = setTimeout(() => {
+          const c = map.getCenter();
+          const z = map.getZoom();
+
+          const mlat = round(c.lat, 5);
+          const mlng = round(c.lng, 5);
+          const mz = Math.round(z);
+
+          const sig = `${mlat},${mlng},${mz}`;
+          if (sig === lastMapSig) return;
+          lastMapSig = sig;
+
+          onMapViewChanged({ mlat, mlng, mz });
+        }, 150);
+      });
     }
 
-    map.on("moveend zoomend", () => {
-      if (applyingFromUrl) return;
-
-      if (mapDebounce) clearTimeout(mapDebounce);
-      mapDebounce = setTimeout(() => {
-        const c = map.getCenter();
-        const z = map.getZoom();
-
-        const mlat = round(c.lat, 5);
-        const mlng = round(c.lng, 5);
-        const mz = Math.round(z);
-
-        const sig = `${mlat},${mlng},${mz}`;
-        if (sig === lastMapSig) return;
-        lastMapSig = sig;
-
-        onMapViewChanged({ mlat, mlng, mz });
-      }, 150);
-    });
+    // Map being ready might allow applying pending state (if UI+Data are ready too)
+    tryApplyPending();
   }
 
   function setLocationsIndex(allLocs) {
@@ -60,13 +68,17 @@ App.Router = (function () {
     });
 
     dataReady = true;
+    tryApplyPending();
+  }
 
-    if (pendingState) {
-      applyState(pendingState);
-      pendingState = null;
-    } else {
-      applyFromUrl();
-    }
+  function tryApplyPending() {
+    // We must not call Search/UI until both exist
+    if (!uiReady || !dataReady) return;
+    if (!pendingState) return;
+
+    const st = pendingState;
+    pendingState = null;
+    applyState(st);
   }
 
   function round(n, dp) {
@@ -79,7 +91,7 @@ App.Router = (function () {
 
     const q = params.get("q") || "";
     const tabRaw = params.get("tab") || "";
-    const tab = (tabRaw === "places") ? "places" : "groups"; // ✅ default groups if missing
+    const tab = (tabRaw === "places") ? "places" : "groups"; // default groups
 
     const fk = params.get("fk") || "";
     const fl = params.get("fl") || "";
@@ -103,9 +115,7 @@ App.Router = (function () {
     const params = new URLSearchParams();
 
     if (state.q) params.set("q", state.q);
-
-    // ✅ Only store tab if it’s NOT the default
-    if (state.tab === "places") params.set("tab", "places");
+    if (state.tab === "places") params.set("tab", "places"); // only store non-default
 
     if (state.fk) params.set("fk", state.fk);
     if (state.fl) params.set("fl", state.fl);
@@ -128,21 +138,15 @@ App.Router = (function () {
     else history.replaceState({}, "", newUrl);
   }
 
-  function applyFromUrl() {
-    applyState(readUrlState());
-  }
-
   function applyState(state) {
     applyingFromUrl = true;
 
     try {
-      // 0) Map view first
+      // 0) Map view first (safe even if UI stuff is delayed)
       if (mapReady && Number.isFinite(state.mlat) && Number.isFinite(state.mlng) && Number.isFinite(state.mz)) {
         map.setView([state.mlat, state.mlng], state.mz, { animate: false });
         lastMapSig = `${round(state.mlat, 5)},${round(state.mlng, 5)},${Math.round(state.mz)}`;
       }
-
-      if (!dataReady) return;
 
       // 1) Tab
       App.Search.setActiveTab(state.tab, { skipUrl: true });
@@ -157,12 +161,14 @@ App.Router = (function () {
       } else if (state.q) {
         const input = App.UI.getSearchInput();
         input.value = state.q;
+
+        // ✅ Crucial: run search and render results immediately
         App.Search.runSearch(state.q, { skipUrl: true, openResultsModal: state.rm });
       } else {
         App.Search.resetAll({ skipUrl: true });
       }
 
-      // 3) Results modal state (if no search just opened it)
+      // 3) Results modal state if needed
       if (!state.q && !(state.fk && state.fl && state.tab === "places")) {
         if (state.rm) App.UI.openResultsModal({ skipUrl: true });
         else App.UI.closeResultsModal({ skipUrl: true });
@@ -286,6 +292,7 @@ App.Router = (function () {
 
   return {
     init,
+    setUiReady,
     setMap,
     setLocationsIndex,
     onSearchChanged,
