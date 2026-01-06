@@ -4,6 +4,7 @@ window.App = window.App || {};
 (function boot() {
   try {
     App.State.init();
+    App.Router.init();
     App.Map.init();
     App.Modal.init();
     App.UI.init();
