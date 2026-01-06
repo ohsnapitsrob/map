@@ -7,11 +7,15 @@ window.App = window.App || {};
     App.Router.init();
 
     App.Map.init();
-    App.Router.setMap(App.Map.getMap()); // ✅ NEW: enable URL <-> map view sync
+    App.Router.setMap(App.Map.getMap());
 
     App.Modal.init();
     App.UI.init();
     App.Search.init();
+
+    // ✅ NEW: tells Router it can now safely apply URL state that calls UI/Search
+    App.Router.setUiReady();
+
     App.Data.init();
   } catch (e) {
     console.error(e);
