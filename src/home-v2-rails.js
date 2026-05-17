@@ -59,6 +59,37 @@ FTS.HomeV2Rails = (function () {
     };
   }
 
+  function franchiseRail(entries, seriesName, options = {}) {
+    if (!U.featureEnabled(options.toggleKey)) return null;
+
+    const direction = options.direction || "asc";
+
+    const items = entries
+      .filter((entry) => U.safeUrl(entry.poster))
+      .filter((entry) => U.key(entry.series) === U.key(seriesName))
+      .sort((a, b) => {
+        const aHasOrder = Number.isFinite(a.railOrder);
+        const bHasOrder = Number.isFinite(b.railOrder);
+
+        if (aHasOrder && bHasOrder) {
+          return direction === "desc" ? b.railOrder - a.railOrder : a.railOrder - b.railOrder;
+        }
+
+        if (aHasOrder && !bHasOrder) return -1;
+        if (!aHasOrder && bHasOrder) return 1;
+
+        return a.title.localeCompare(b.title);
+      })
+      .slice(0, MAX_RAIL_ITEMS);
+
+    if (!items.length) return null;
+
+    return {
+      title: seriesName,
+      items
+    };
+  }
+
   function genreRails(entries) {
     if (!U.featureEnabled("homeGenreRailsEnabled")) return [];
 
@@ -170,10 +201,14 @@ FTS.HomeV2Rails = (function () {
     const latest = latestRail(entries);
     const topFilms = topUKRail(entries, "Film");
     const topSeries = topUKRail(entries, "TV");
+    const jamesBond = franchiseRail(entries, "James Bond", { toggleKey: "homeRailJamesBondEnabled", direction: "desc" });
+    const harryPotter = franchiseRail(entries, "Harry Potter", { toggleKey: "homeRailHarryPotterEnabled", direction: "asc" });
 
     const randomRails = [
       topFilms,
       topSeries,
+      jamesBond,
+      harryPotter,
       ...genreRails(entries)
     ].filter(Boolean);
 
