@@ -105,13 +105,6 @@
     return rowsToObjects(parseCSV(await response.text()));
   }
 
-  async function loadSceneRows() {
-    const sheets = config.SHEETS || {};
-    const urls = [sheets.movies, sheets.tv, sheets.music_videos, sheets.misc, sheets.games].filter(Boolean);
-    const groups = await Promise.all(urls.map(fetchCSV));
-    return groups.flat();
-  }
-
   function redirectTo404(reason) {
     const params = new URLSearchParams();
     params.set("env-guard", reason || "person");
@@ -159,9 +152,11 @@
       .filter((section) => section.items.length > 0)
       .sort((a, b) => b.items.length - a.items.length || a.title.localeCompare(b.title));
 
+    const showSectionTitles = sections.length > 1;
+
     grid.innerHTML = sections.map((section) => `
       <section class="person-section">
-        <h2 class="person-section-title">${section.title}</h2>
+        ${showSectionTitles ? `<h2 class="person-section-title">${section.title}</h2>` : ""}
         <div class="person-grid-section">
           ${section.items.map(posterCard).join("")}
         </div>
