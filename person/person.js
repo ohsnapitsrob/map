@@ -119,9 +119,10 @@
     const field = mode === "star" ? "Stars" : "Director";
 
     try {
-      const [metadata, sceneRows] = await Promise.all([
+      const [metadata, sceneRows, peopleRows] = await Promise.all([
         fetchCSV(config.TITLE_METADATA_CSV),
-        loadSceneRows()
+        loadSceneRows(),
+        fetchCSV(config.PEOPLE_CSV)
       ]);
 
       const matches = metadata.filter((item) => {
@@ -133,6 +134,19 @@
       if (!matches.length) {
         redirectTo404("person");
         return;
+      }
+
+      const personEntry = peopleRows.find((row) => {
+        return normaliseKey(getValue(row, "name")) === target;
+      });
+
+      const personPhoto = normalise(getValue(personEntry || {}, "photo"));
+
+      if (personPhoto) {
+        const photoContainer = document.getElementById("personPhoto");
+
+        photoContainer.classList.add("is-visible");
+        photoContainer.innerHTML = `<img src="${personPhoto}" alt="${label}" loading="eager">`;
       }
 
       const sceneCounts = new Map();
