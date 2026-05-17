@@ -7,7 +7,7 @@
 
   function getSharedScriptBase() {
     const path = window.location.pathname.replace(/\/+$/, "");
-    const routeNames = ["browse", "explore", "title", "stats", "national-trust", "privacy"];
+    const routeNames = ["browse", "explore", "title", "stats", "national-trust", "privacy", "metadata", "person"];
     const isNestedRoute = routeNames.some((route) => path.endsWith(`/${route}`));
 
     return isNestedRoute ? "../src/" : "./src/";
