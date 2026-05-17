@@ -1,5 +1,10 @@
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
+  overflow-x: hidden;
   background:
     radial-gradient(circle at 8% 8%, rgba(90, 0, 230, 0.10), transparent 26%),
     radial-gradient(circle at 92% 24%, rgba(90, 0, 230, 0.08), transparent 24%),
@@ -9,11 +14,20 @@ body {
 }
 
 .meta-shell {
-  width: min(1240px, 100%);
+  width: min(100%, 1240px);
   margin: 0 auto;
   padding: 22px 18px 120px;
   display: grid;
   gap: 26px;
+  min-width: 0;
+}
+
+.meta-hero,
+.meta-content,
+.meta-section,
+.meta-group,
+.meta-links {
+  min-width: 0;
 }
 
 .meta-hero {
@@ -38,10 +52,12 @@ body {
 
 .meta-hero h1 {
   margin: 0;
+  max-width: 920px;
   font-size: clamp(34px, 7vw, 72px);
   line-height: 0.95;
   letter-spacing: -0.06em;
   font-weight: 900;
+  overflow-wrap: anywhere;
 }
 
 .meta-hero p {
@@ -79,8 +95,9 @@ body {
 
 .meta-group-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
   gap: 18px;
+  min-width: 0;
 }
 
 .meta-group {
@@ -95,6 +112,7 @@ body {
   font-size: 18px;
   font-weight: 850;
   line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
 .meta-group-title a {
@@ -116,6 +134,7 @@ body {
 .meta-link {
   display: inline-flex;
   align-items: center;
+  max-width: 100%;
   min-height: 36px;
   padding: 0 12px;
   border-radius: 999px;
@@ -124,6 +143,7 @@ body {
   text-decoration: none;
   font-size: 14px;
   font-weight: 750;
+  overflow-wrap: anywhere;
 }
 
 .meta-link:hover {
