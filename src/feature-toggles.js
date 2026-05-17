@@ -7,6 +7,7 @@ FTS.FeatureToggles = {
   privacyConsentEnabled: true,
   mediaEmbedsEnabled: true,
   plausibleAnalyticsEnabled: true,
+  plausibleAnalyticsOnStagingEnabled: false,
   siteDisclaimerEnabled: false,
   settingsMapSectionEnabled: true,
 
