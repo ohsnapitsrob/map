@@ -4,14 +4,18 @@
 
     const path = window.location.pathname.replace(/\/+$/, "");
 
-    if (
-      path.endsWith("/browse") ||
-      path.endsWith("/explore") ||
-      path.endsWith("/title") ||
-      path.endsWith("/stats") ||
-      path.endsWith("/national-trust") ||
-      path.endsWith("/privacy")
-    ) {
+    const nestedRoutes = [
+      "/browse",
+      "/explore",
+      "/title",
+      "/stats",
+      "/national-trust",
+      "/privacy",
+      "/metadata",
+      "/person"
+    ];
+
+    if (nestedRoutes.some((route) => path.endsWith(route))) {
       return "../";
     }
 
@@ -47,7 +51,13 @@
     if (path.endsWith("/privacy")) return null;
     if (path.endsWith("/browse")) return "browse";
     if (path.endsWith("/explore")) return "map";
-    if (path.endsWith("/title") || path.endsWith("/stats") || path.endsWith("/national-trust")) return "browse";
+    if (
+      path.endsWith("/title") ||
+      path.endsWith("/stats") ||
+      path.endsWith("/national-trust") ||
+      path.endsWith("/metadata") ||
+      path.endsWith("/person")
+    ) return "browse";
 
     return "home";
   }
@@ -67,69 +77,7 @@
 
     const style = document.createElement("style");
     style.id = "fts-bottom-nav-style";
-    style.textContent = `
-      body.fts-has-bottom-nav {
-        padding-bottom: calc(88px + env(safe-area-inset-bottom));
-      }
-
-      body.fts-has-bottom-nav:has(#map) {
-        padding-bottom: 0;
-      }
-
-      .fts-bottom-nav {
-        position: fixed;
-        left: 50%;
-        bottom: calc(14px + env(safe-area-inset-bottom));
-        z-index: 3600;
-        width: min(460px, calc(100vw - 20px));
-        transform: translateX(-50%);
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 6px;
-        padding: 7px;
-        border: 1px solid rgba(229, 231, 235, 0.9);
-        border-radius: 24px;
-        background: rgba(255, 255, 255, 0.88);
-        box-shadow: 0 18px 50px rgba(15, 23, 42, 0.18);
-        backdrop-filter: blur(18px);
-        -webkit-backdrop-filter: blur(18px);
-      }
-
-      .fts-bottom-nav a {
-        min-width: 0;
-        min-height: 54px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 4px;
-        border-radius: 18px;
-        color: #6b7280;
-        text-decoration: none;
-        font-size: 11px;
-        font-weight: 750;
-        letter-spacing: 0.01em;
-        -webkit-tap-highlight-color: transparent;
-      }
-
-      .fts-bottom-nav a[aria-current="page"] {
-        background: #111827;
-        color: #ffffff;
-      }
-
-      .fts-bottom-nav svg {
-        width: 22px;
-        height: 22px;
-        fill: currentColor;
-      }
-
-      @media (min-width: 900px) {
-        .fts-bottom-nav {
-          width: 420px;
-          bottom: 18px;
-        }
-      }
-    `;
+    style.textContent = `...`;
 
     document.head.appendChild(style);
   }
