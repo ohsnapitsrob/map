@@ -212,6 +212,7 @@ FTS.HomeV2Rails = (function () {
 
     return {
       title: "Following in their footsteps",
+      subHeader: "A random selection of people associated with titles that have scenes visited",
       items,
       suppressOverlays: true
     };
