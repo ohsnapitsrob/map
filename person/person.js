@@ -170,6 +170,7 @@
         const card = document.createElement("a");
         card.className = "person-card";
         card.href = `../title/?fl=${encodeURIComponent(title)}`;
+        card.setAttribute("aria-label", title);
 
         card.innerHTML = `
           <div class="poster-card">
@@ -177,7 +178,6 @@
               ? `<img src="${poster}" alt="${title}" loading="lazy">`
               : `<div class="poster-fallback">${title}</div>`}
           </div>
-          <div class="person-card-title">${title}</div>
         `;
 
         grid.appendChild(card);
