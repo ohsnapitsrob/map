@@ -167,11 +167,11 @@
 
       document.title = `${label} | Find That Scene`;
 
-      document.getElementById("personKicker").textContent = mode === "star" ? "Star" : "Director";
+      const kicker = document.getElementById("personKicker");
+      if (kicker) kicker.remove();
+
       document.getElementById("personTitle").textContent = label;
-      document.getElementById("personCopy").textContent = mode === "star"
-        ? `${matches.length} title${matches.length === 1 ? "" : "s"} featuring ${label}.`
-        : `${matches.length} title${matches.length === 1 ? "" : "s"} directed by ${label}.`;
+      document.getElementById("personCopy").textContent = `Involved in ${matches.length} title${matches.length === 1 ? "" : "s"} with scenes found.`;
 
       const grid = document.getElementById("personGrid");
       grid.innerHTML = "";
