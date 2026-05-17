@@ -1,105 +1,192 @@
-async function boot() {
-  const params = new URLSearchParams(window.location.search);
-  const star = params.get('star');
-  const director = params.get('director');
+(function () {
+  const config = window.APP_CONFIG || {};
 
-  if ((!star && !director) || (star && director)) {
-    window.location.replace('/404.html?env-guard=person');
-    return;
+  function normalise(value) {
+    return (value || "").toString().trim();
   }
 
-  const mode = star ? 'star' : 'director';
-  const target = decodeURIComponent(star || director).trim().toLowerCase();
+  function normaliseKey(value) {
+    return normalise(value).toLowerCase();
+  }
 
-  try {
-    const [metaResponse, scenesResponse] = await Promise.all([
-      fetch('../data/metadata.csv'),
-      fetch('../data/scenes.csv')
-    ]);
+  function getValue(row, key) {
+    const target = normaliseKey(key);
+    const matchedKey = Object.keys(row).find((rowKey) => normaliseKey(rowKey) === target);
+    return matchedKey ? row[matchedKey] : "";
+  }
 
-    const metaText = await metaResponse.text();
-    const scenesText = await scenesResponse.text();
+  function splitList(value) {
+    return normalise(value)
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
 
-    const metadata = Papa.parse(metaText, {
-      header: true,
-      skipEmptyLines: true
-    }).data;
+  function parseCSV(text) {
+    const rows = [];
+    let row = [];
+    let current = "";
+    let inQuotes = false;
 
-    const scenes = Papa.parse(scenesText, {
-      header: true,
-      skipEmptyLines: true
-    }).data;
+    for (let i = 0; i < text.length; i++) {
+      const character = text[i];
+      const next = text[i + 1];
 
-    const field = mode === 'star' ? 'Stars' : 'Director';
+      if (character === '"' && inQuotes && next === '"') {
+        current += '"';
+        i++;
+        continue;
+      }
 
-    const matches = metadata.filter(item => {
-      const raw = item[field] || '';
+      if (character === '"') {
+        inQuotes = !inQuotes;
+        continue;
+      }
 
-      return raw
-        .split(',')
-        .map(value => value.trim().toLowerCase())
-        .includes(target);
+      if (character === "," && !inQuotes) {
+        row.push(current);
+        current = "";
+        continue;
+      }
+
+      if ((character === "\n" || character === "\r") && !inQuotes) {
+        if (character === "\r" && next === "\n") i++;
+        row.push(current);
+        current = "";
+        if (row.length > 1 || row[0] !== "") rows.push(row);
+        row = [];
+        continue;
+      }
+
+      current += character;
+    }
+
+    row.push(current);
+    if (row.length > 1 || row[0] !== "") rows.push(row);
+
+    return rows;
+  }
+
+  function rowsToObjects(rows) {
+    if (!rows.length) return [];
+
+    const headers = rows[0].map(normalise);
+
+    return rows.slice(1).map((row) => {
+      const obj = {};
+      headers.forEach((header, index) => {
+        obj[header] = row[index] || "";
+      });
+      return obj;
     });
+  }
 
-    if (!matches.length) {
-      window.location.replace('/404.html?env-guard=person');
+  async function fetchCSV(url) {
+    if (!url) return [];
+
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) throw new Error(`Could not load CSV: ${url}`);
+
+    return rowsToObjects(parseCSV(await response.text()));
+  }
+
+  async function loadSceneRows() {
+    const sheets = config.SHEETS || {};
+    const urls = [sheets.movies, sheets.tv, sheets.music_videos, sheets.misc, sheets.games].filter(Boolean);
+    const groups = await Promise.all(urls.map(fetchCSV));
+    return groups.flat();
+  }
+
+  function redirectTo404(reason) {
+    const params = new URLSearchParams();
+    params.set("env-guard", reason || "person");
+    window.location.replace(`/404.html?${params.toString()}`);
+  }
+
+  async function boot() {
+    const params = new URLSearchParams(window.location.search);
+    const star = params.get("star");
+    const director = params.get("director");
+
+    if ((!star && !director) || (star && director)) {
+      redirectTo404("person");
       return;
     }
 
-    const sceneCounts = new Map();
+    const mode = star ? "star" : "director";
+    const label = normalise(star || director);
+    const target = normaliseKey(label);
+    const field = mode === "star" ? "Stars" : "Director";
 
-    scenes.forEach(scene => {
-      const title = (scene.Title || '').trim();
-      if (!title) return;
+    try {
+      const [metadata, sceneRows] = await Promise.all([
+        fetchCSV(config.TITLE_METADATA_CSV),
+        loadSceneRows()
+      ]);
 
-      sceneCounts.set(title, (sceneCounts.get(title) || 0) + 1);
-    });
+      const matches = metadata.filter((item) => {
+        return splitList(getValue(item, field))
+          .map(normaliseKey)
+          .includes(target);
+      });
 
-    matches.sort((a, b) => {
-      const aCount = sceneCounts.get(a.title) || 0;
-      const bCount = sceneCounts.get(b.title) || 0;
-      return bCount - aCount;
-    });
+      if (!matches.length) {
+        redirectTo404("person");
+        return;
+      }
 
-    document.title = `${star || director} | Find That Scene`;
+      const sceneCounts = new Map();
 
-    document.getElementById('personKicker').textContent = mode === 'star'
-      ? 'Star'
-      : 'Director';
+      sceneRows.forEach((scene) => {
+        const title = normalise(getValue(scene, "title"));
+        if (!title) return;
+        sceneCounts.set(normaliseKey(title), (sceneCounts.get(normaliseKey(title)) || 0) + 1);
+      });
 
-    document.getElementById('personTitle').textContent = star || director;
+      matches.sort((a, b) => {
+        const aTitle = normalise(getValue(a, "title"));
+        const bTitle = normalise(getValue(b, "title"));
+        const aCount = sceneCounts.get(normaliseKey(aTitle)) || 0;
+        const bCount = sceneCounts.get(normaliseKey(bTitle)) || 0;
+        return bCount - aCount || aTitle.localeCompare(bTitle);
+      });
 
-    document.getElementById('personCopy').textContent = mode === 'star'
-      ? `${matches.length} title${matches.length === 1 ? '' : 's'} featuring ${(star || '').trim()}.`
-      : `${matches.length} title${matches.length === 1 ? '' : 's'} directed by ${(director || '').trim()}.`;
+      document.title = `${label} | Find That Scene`;
 
-    const grid = document.getElementById('personGrid');
+      document.getElementById("personKicker").textContent = mode === "star" ? "Star" : "Director";
+      document.getElementById("personTitle").textContent = label;
+      document.getElementById("personCopy").textContent = mode === "star"
+        ? `${matches.length} title${matches.length === 1 ? "" : "s"} featuring ${label}.`
+        : `${matches.length} title${matches.length === 1 ? "" : "s"} directed by ${label}.`;
 
-    matches.forEach(item => {
-      const card = document.createElement('a');
-      card.className = 'person-card';
-      card.href = `../title/?fl=${encodeURIComponent(item.title || '')}`;
+      const grid = document.getElementById("personGrid");
+      grid.innerHTML = "";
 
-      const poster = item.poster || '';
+      matches.forEach((item) => {
+        const title = normalise(getValue(item, "title"));
+        const poster = normalise(getValue(item, "poster"));
+        if (!title) return;
 
-      card.innerHTML = `
-        <div class="poster-card">
-          ${poster
-            ? `<img src="${poster}" alt="${item.title || ''}">`
-            : `<div class="poster-fallback">${item.title || ''}</div>`}
-        </div>
-        <div class="person-card-title">${item.title || ''}</div>
-      `;
+        const card = document.createElement("a");
+        card.className = "person-card";
+        card.href = `../title/?fl=${encodeURIComponent(title)}`;
 
-      grid.appendChild(card);
-    });
-  } catch (error) {
-    console.error(error);
-    window.location.replace('/404.html?env-guard=person');
+        card.innerHTML = `
+          <div class="poster-card">
+            ${poster
+              ? `<img src="${poster}" alt="${title}" loading="lazy">`
+              : `<div class="poster-fallback">${title}</div>`}
+          </div>
+          <div class="person-card-title">${title}</div>
+        `;
+
+        grid.appendChild(card);
+      });
+    } catch (error) {
+      console.error(error);
+      redirectTo404("person");
+    }
   }
-}
 
-const papaScript = document.createElement('script');
-papaScript.src = 'https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js';
-papaScript.onload = boot;
-document.head.appendChild(papaScript);
+  boot();
+})();
