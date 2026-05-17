@@ -21,7 +21,8 @@ FTS.FeatureToggles = {
   homeRailTVEnabled: false,
   homeRailMusicVideosEnabled: true,
   homeRailNationalTrustEnabled: true,
-  homeRailGamesEnabled: false,
+  homeRailPeopleEnabled: true,
+  homeRailGamesEnabled: true,
   homeGenreRailsEnabled: true
 };
 
