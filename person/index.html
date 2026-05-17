@@ -22,14 +22,6 @@
     .person-card-title { font-size:13px; font-weight:850; line-height:1.2; }
     .person-empty { background:#fff; border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:var(--shadow-card); padding:20px; color:#555; }
   </style>
-  <script src="../runtime-config.js"></script>
-  <script src="../config.js"></script>
-  <script src="../src/feature-toggles.js"></script>
-  <script src="../src/environment-rules.js"></script>
-  <script src="../src/environment-guards.js"></script>
-  <script>
-    window.FTS?.EnvironmentGuards?.init?.();
-  </script>
 </head>
 <body>
   <div data-app-header></div>
@@ -43,7 +35,15 @@
       <div class="person-grid" id="personGrid"></div>
     </section>
   </main>
+  <script src="../runtime-config.js"></script>
+  <script src="../config.js"></script>
+  <script src="../src/feature-toggles.js"></script>
+  <script src="../src/environment-rules.js"></script>
+  <script src="../src/environment-guards.js"></script>
   <script src="../src/app-header.js"></script>
+  <script>
+    window.FTS?.EnvironmentGuards?.init?.();
+  </script>
   <script src="./person.js"></script>
 </body>
 </html>
