@@ -2,6 +2,8 @@ window.FTS = window.FTS || {};
 
 FTS.HomePeopleRail = (function () {
   const MAX_ITEMS = 12;
+  let builtMarkup = "";
+  let insertTimer = null;
 
   function norm(value) { return (value || "").toString().trim(); }
   function key(value) { return norm(value).toLowerCase(); }
@@ -111,6 +113,7 @@ FTS.HomePeopleRail = (function () {
   }
 
   async function html() {
+    if (builtMarkup) return builtMarkup;
     if (window.FTS?.Features?.isEnabled("homeRailPeopleEnabled") === false) return "";
     const cfg = window.APP_CONFIG || {};
     const sheets = cfg.SHEETS || {};
@@ -122,33 +125,88 @@ FTS.HomePeopleRail = (function () {
     ]);
     const items = shuffle(eligiblePeople(metadataRows, peopleRows, sceneGroups.flat())).slice(0, MAX_ITEMS);
     if (!items.length) return "";
-    return `<section class="rail rail-people"><div class="rail-header"><div><h2 class="rail-title">Following in their footsteps</h2></div></div><div class="poster-row people-row">${items.map((item) => `<a class="poster-link people-link" href="${escapeHtml(item.href)}" aria-label="${escapeHtml(item.title)}"><div class="poster-card people-card"><img src="${escapeHtml(item.poster)}" alt="${escapeHtml(item.title)}" loading="lazy" draggable="false"></div></a>`).join("")}</div></section>`;
+    builtMarkup = `<section class="rail rail-people"><div class="rail-header"><div><h2 class="rail-title">Following in their footsteps</h2></div></div><div class="poster-row people-row">${items.map((item) => `<a class="poster-link people-link" href="${escapeHtml(item.href)}" aria-label="${escapeHtml(item.title)}"><div class="poster-card people-card"><img src="${escapeHtml(item.poster)}" alt="${escapeHtml(item.title)}" loading="lazy" draggable="false"></div></a>`).join("")}</div></section>`;
+    return builtMarkup;
   }
 
-  async function insert() {
+  function enableDrag(rail) {
+    if (!rail || rail.dataset.peopleDragReady === "true") return;
+    rail.dataset.peopleDragReady = "true";
+    rail.scrollLeft = 0;
+    let isDown = false;
+    let startX = 0;
+    let scrollLeft = 0;
+    let moved = false;
+    rail.addEventListener("mousedown", (e) => {
+      if (e.button !== 0) return;
+      isDown = true;
+      moved = false;
+      startX = e.pageX;
+      scrollLeft = rail.scrollLeft;
+      rail.classList.add("is-dragging");
+    });
+    window.addEventListener("mousemove", (e) => {
+      if (!isDown) return;
+      const walk = e.pageX - startX;
+      if (Math.abs(walk) > 5) moved = true;
+      rail.scrollLeft = scrollLeft - walk;
+    });
+    window.addEventListener("mouseup", () => {
+      if (!isDown) return;
+      isDown = false;
+      rail.classList.remove("is-dragging");
+      if (moved) {
+        rail.dataset.justDragged = "true";
+        setTimeout(() => { delete rail.dataset.justDragged; }, 150);
+      }
+    });
+    rail.addEventListener("click", (e) => {
+      if (rail.dataset.justDragged === "true") {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }, true);
+  }
+
+  function railsLookReady(railsRoot) {
+    const loading = railsRoot.querySelector(".loading-card");
+    const rails = railsRoot.querySelectorAll(":scope > .rail");
+    return !loading && rails.length > 0;
+  }
+
+  async function placeRail() {
     const railsRoot = document.getElementById("railsRoot");
-    if (!railsRoot || document.querySelector(".rail-people")) return;
-    const markup = await html().catch((error) => { console.warn("Could not build people rail", error); return ""; });
-    if (!markup) return;
-    const template = document.createElement("template");
-    template.innerHTML = markup.trim();
-    const rail = template.content.firstElementChild;
-    const rails = Array.from(railsRoot.querySelectorAll(":scope > .rail"));
-    const gamesRail = rails.find((item) => item.querySelector(".rail-title")?.textContent.trim().toLowerCase() === "games");
+    if (!railsRoot || !railsLookReady(railsRoot)) return;
+    const existing = railsRoot.querySelector(":scope > .rail-people");
+    let rail = existing;
+    if (!rail) {
+      const markup = await html().catch((error) => { console.warn("Could not build people rail", error); return ""; });
+      if (!markup) return;
+      const template = document.createElement("template");
+      template.innerHTML = markup.trim();
+      rail = template.content.firstElementChild;
+    }
+    const gamesRail = Array.from(railsRoot.querySelectorAll(":scope > .rail")).find((item) => item !== rail && item.querySelector(".rail-title")?.textContent.trim().toLowerCase() === "games");
     if (gamesRail) railsRoot.insertBefore(rail, gamesRail);
     else railsRoot.appendChild(rail);
+    enableDrag(rail.querySelector(".poster-row"));
+  }
+
+  function schedulePlace() {
+    clearTimeout(insertTimer);
+    insertTimer = setTimeout(placeRail, 250);
   }
 
   function init() {
     const railsRoot = document.getElementById("railsRoot");
     if (!railsRoot) return;
-    const observer = new MutationObserver(() => insert());
+    const observer = new MutationObserver(schedulePlace);
     observer.observe(railsRoot, { childList: true });
-    insert();
+    schedulePlace();
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
 
-  return { html, insert };
+  return { html, insert: placeRail };
 })();
