@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Person | Find That Scene</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../src/header.css">
+  <link rel="stylesheet" href="../home.css">
+  <style>
+    .person-shell { width: min(1240px,100%); margin:0 auto; padding:22px 18px 56px; display:grid; gap:26px; }
+    .person-hero { background:#fff; border:1px solid var(--border); border-radius:var(--radius-xl); box-shadow:var(--shadow-card); padding:24px; display:grid; gap:10px; }
+    .person-kicker { margin:0; color:#9ca3af; font-size:12px; font-weight:850; letter-spacing:.08em; text-transform:uppercase; }
+    .person-title { margin:0; font-size:clamp(34px,7vw,72px); line-height:.95; letter-spacing:-.06em; font-weight:900; }
+    .person-copy { margin:0; color:#555; font-size:15px; line-height:1.5; max-width:720px; }
+    .person-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:18px 16px; }
+    .person-card { color:inherit; text-decoration:none; display:grid; gap:10px; }
+    .person-card .poster-card { width:100%; }
+    .person-card .poster-card img { width:100%; }
+    .person-card-title { font-size:13px; font-weight:850; line-height:1.2; }
+    .person-empty { background:#fff; border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:var(--shadow-card); padding:20px; color:#555; }
+  </style>
+</head>
+<body>
+  <div data-app-header></div>
+  <main class="person-shell">
+    <section class="person-hero">
+      <p class="person-kicker" id="personKicker">Person</p>
+      <h1 class="person-title" id="personTitle">Loading…</h1>
+      <p class="person-copy" id="personCopy">Finding matching titles from the metadata archive.</p>
+    </section>
+    <section>
+      <div class="person-grid" id="personGrid"></div>
+    </section>
+  </main>
+  <script src="../config.js"></script>
+  <script src="../src/feature-toggles.js"></script>
+  <script src="../src/app-header.js"></script>
+  <script src="./person.js"></script>
+</body>
+</html>
