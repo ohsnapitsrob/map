@@ -25,7 +25,7 @@
   function normaliseType(value) {
     const type = normaliseKey(value);
 
-    if (type === "film" || type === "movie" || type === "movies") return "movies";
+    if (type === "film" || type === "films" || type === "movie" || type === "movies") return "movies";
     if (type === "tv" || type === "tv show" || type === "tv shows" || type === "series") return "tv";
 
     return "other";
@@ -128,7 +128,7 @@
     `;
   }
 
-  function renderGroupedPosters(grid, matches) {
+  function renderGroupedPosters(grid, matches, priorityType) {
     const groups = new Map([
       ["movies", []],
       ["tv", []],
@@ -143,6 +143,8 @@
       groups.get(groupKey).push(item);
     });
 
+    const priorityKey = normaliseType(priorityType);
+
     const sections = Array.from(groups.entries())
       .map(([key, items]) => ({
         key,
@@ -150,7 +152,14 @@
         items: items.sort((a, b) => normalise(getValue(a, "title")).localeCompare(normalise(getValue(b, "title"))))
       }))
       .filter((section) => section.items.length > 0)
-      .sort((a, b) => b.items.length - a.items.length || a.title.localeCompare(b.title));
+      .sort((a, b) => {
+        if (priorityKey !== "other") {
+          if (a.key === priorityKey && b.key !== priorityKey) return -1;
+          if (b.key === priorityKey && a.key !== priorityKey) return 1;
+        }
+
+        return b.items.length - a.items.length || a.title.localeCompare(b.title);
+      });
 
     const showSectionTitles = sections.length > 1;
 
@@ -167,6 +176,7 @@
   async function boot() {
     const params = new URLSearchParams(window.location.search);
     const genre = normalise(params.get("genre"));
+    const type = normalise(params.get("type"));
 
     if (!genre) {
       redirectTo404("genre");
@@ -195,7 +205,7 @@
       document.getElementById("genreCopy").textContent = `Appears in ${matches.length} title${matches.length === 1 ? "" : "s"} with scenes found.`;
 
       const grid = document.getElementById("genreGrid");
-      renderGroupedPosters(grid, matches);
+      renderGroupedPosters(grid, matches, type);
     } catch (error) {
       console.error(error);
       redirectTo404("genre");
