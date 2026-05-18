@@ -13,12 +13,12 @@ FTS.HomeV2Renderer = (function () {
       .rail-header > div:first-child { min-width: 0; }
       .rail-link, .rail-title-link { padding: 4px 8px; }
       .rail-carousel { width: 100%; max-width: 100%; overflow: hidden; }
-      .hero-carousel-row { display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -ms-overflow-style: none; scroll-snap-type: x mandatory; padding: 0; width: 100%; max-width: 100%; box-sizing: border-box; }
+      .hero-carousel-row { display: flex; gap: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -ms-overflow-style: none; scroll-snap-type: x mandatory; padding: 0; width: 100%; max-width: 100%; box-sizing: border-box; }
       .hero-carousel-row::-webkit-scrollbar { display: none; }
       .hero-carousel-card { position: relative; flex: 0 0 100%; max-width: 100%; aspect-ratio: 3 / 1; border-radius: 0; overflow: hidden; text-decoration: none; background: #111827; scroll-snap-align: start; box-shadow: none; transform: none; transition: none; box-sizing: border-box; }
       .hero-carousel-card:hover, .hero-carousel-card:focus-visible { transform: none; }
       .hero-carousel-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
-      .hero-carousel-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.72), rgba(0,0,0,0.08) 55%, rgba(0,0,0,0)); display: flex; align-items: flex-end; padding: 22px; box-sizing: border-box; }
+      .hero-carousel-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.72), rgba(0,0,0,0.08) 55%, rgba(0,0,0,0)); display: flex; align-items: flex-end; padding: 24px 28px; box-sizing: border-box; }
       .hero-carousel-title { color: #fff; font-size: clamp(12px, 2vw, 24px); font-weight: 900; line-height: 0.95; letter-spacing: -0.04em; text-shadow: 0 4px 18px rgba(0,0,0,0.4); }
       .rail-link-icon { width: 38px; height: 38px; padding: 4px 8px; display: inline-flex; align-items: center; justify-content: center; justify-self: end; align-self: center; border-radius: 999px; background: rgba(111, 66, 193, 0.12); color: #6f42c1; text-decoration: none; flex: 0 0 auto; box-sizing: border-box; }
       .rail-link-icon svg { width: 24px; height: 24px; display: block; fill: currentColor; }
