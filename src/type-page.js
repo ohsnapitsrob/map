@@ -110,6 +110,14 @@
     `;
   }
 
+  function getTypeKeys(pageConfig) {
+    if (Array.isArray(pageConfig.types)) {
+      return pageConfig.types.map(key);
+    }
+
+    return [key(pageConfig.type)];
+  }
+
   async function boot() {
     const pageConfig = window.FTS_TYPE_PAGE;
     if (!pageConfig) return;
@@ -117,9 +125,10 @@
     ensureFallbackStyles();
 
     const rows = await fetchCSV(config.TITLE_METADATA_CSV);
+    const typeKeys = getTypeKeys(pageConfig);
 
     const matches = rows
-      .filter((row) => key(getValue(row, "type")) === key(pageConfig.type))
+      .filter((row) => typeKeys.includes(key(getValue(row, "type"))))
       .sort((a, b) => norm(getValue(a, "title")).localeCompare(norm(getValue(b, "title"))));
 
     document.title = `${pageConfig.label} | Find That Scene`;
