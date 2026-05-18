@@ -184,11 +184,17 @@
     });
   }
 
-  loadRoutes().then(() => {
+  loadRoutes().then(async () => {
+    await Promise.all([
+      loadAppHeaderModules(),
+      loadBottomNav()
+    ]);
+
+    document.documentElement.setAttribute("data-shell-ready", "true");
+
     loadPrivacySystem();
     loadAppSettings();
     loadVisibility();
-    loadAppHeaderModules();
     loadEasterEggs();
 
     if (window.FTS?.Features?.isEnabled("iosInstallPromptEnabled") === true) {
@@ -197,7 +203,6 @@
 
     loadAnalytics();
     showEnvironmentBadge();
-    loadBottomNav();
   });
 
   window.addEventListener("load", () => {
