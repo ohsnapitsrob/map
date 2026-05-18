@@ -1,0 +1,24 @@
+.fts-loader,
+.loading-card {
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+  color: transparent;
+}
+
+.fts-loader::before,
+.loading-card::before {
+  content: "";
+  width: 34px;
+  height: 34px;
+  border: 3px solid rgba(90, 0, 230, 0.14);
+  border-top-color: var(--purple, #5A00E6);
+  border-radius: 999px;
+  animation: fts-spin 780ms linear infinite;
+}
+
+@keyframes fts-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
