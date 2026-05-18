@@ -19,7 +19,7 @@
 
   function getFallbackScriptBase() {
     const path = window.location.pathname.replace(/\/+$/, "");
-    const routeNames = ["browse", "explore", "title", "stats", "national-trust", "privacy", "metadata", "person", "genre"];
+    const routeNames = ["browse", "explore", "title", "stats", "national-trust", "privacy", "metadata", "person", "genre", "films", "series", "music-videos", "games", "other"];
     const isNestedRoute = routeNames.some((route) => path.endsWith(`/${route}`));
     return isNestedRoute ? "../src/" : "./src/";
   }
