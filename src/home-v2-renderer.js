@@ -35,6 +35,22 @@ FTS.HomeV2Renderer = (function () {
     `;
   }
 
+  function railLink(railConfig) {
+    if (!railConfig.href) return "";
+
+    const chevron = `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M9.29 6.71a1 1 0 0 0 0 1.41L13.17 12l-3.88 3.88a1 1 0 1 0 1.41 1.41l4.59-4.59a1 1 0 0 0 0-1.41L10.7 6.7a1 1 0 0 0-1.41 0z"></path>
+      </svg>
+    `;
+
+    return `
+      <a class="rail-link rail-link-icon" href="${U.escapeHtml(railConfig.href)}" aria-label="${U.escapeHtml(railConfig.linkLabel || railConfig.title)}">
+        ${railConfig.linkIcon === "chevron" ? chevron : U.escapeHtml(railConfig.linkLabel || "View more")}
+      </a>
+    `;
+  }
+
   function rail(railConfig) {
     if (!railConfig?.items?.length) return "";
 
@@ -45,7 +61,7 @@ FTS.HomeV2Renderer = (function () {
             <h2 class="rail-title">${U.escapeHtml(railConfig.title)}</h2>
             ${railConfig.subHeader ? `<p class="rail-subtitle">${U.escapeHtml(railConfig.subHeader)}</p>` : ""}
           </div>
-          ${railConfig.href ? `<a class="rail-link" href="${U.escapeHtml(railConfig.href)}">${U.escapeHtml(railConfig.linkLabel || "View more")}</a>` : ""}
+          ${railLink(railConfig)}
         </div>
 
         <div class="poster-row ${railConfig.variant === "thumbnail" ? "thumbnail-row" : ""}">
