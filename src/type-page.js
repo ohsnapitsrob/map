@@ -64,19 +64,18 @@
     return [key(pageConfig.type)];
   }
   async function getVisibleTitleKeys() {
-    if (window.FTS?.TitleVisibility?.visibleTitleKeys) {
-      return window.FTS.TitleVisibility.visibleTitleKeys();
-    }
+    if (window.FTS?.TitleVisibility?.visibleTitleKeys) return window.FTS.TitleVisibility.visibleTitleKeys();
     return null;
   }
   async function boot() {
     const pageConfig = window.FTS_TYPE_PAGE;
     if (!pageConfig) return;
     ensureFallbackStyles();
-    const [rows, visibleTitleKeys] = await Promise.all([
-      fetchCSV(config.TITLE_METADATA_CSV),
-      getVisibleTitleKeys()
-    ]);
+    const hero = document.querySelector(".person-hero");
+    const grid = document.getElementById("typeGrid");
+    if (hero) hero.hidden = true;
+    if (grid) grid.innerHTML = `<div class="fts-loader" aria-label="Loading"></div>`;
+    const [rows, visibleTitleKeys] = await Promise.all([fetchCSV(config.TITLE_METADATA_CSV), getVisibleTitleKeys()]);
     const typeKeys = getTypeKeys(pageConfig);
     const matches = rows
       .filter((row) => typeKeys.includes(key(getValue(row, "type"))))
@@ -86,6 +85,7 @@
     document.getElementById("typeTitle").textContent = pageConfig.label;
     document.getElementById("typeCopy").textContent = `${matches.length} title${matches.length === 1 ? "" : "s"} with scenes found.`;
     document.getElementById("typeGrid").innerHTML = matches.map(posterCard).join("");
+    if (hero) hero.hidden = false;
   }
   boot();
 })();
