@@ -6,11 +6,7 @@
   }
 
   function getSharedScriptBase() {
-    const path = window.location.pathname.replace(/\/+$/, "");
-    const routeNames = ["browse", "explore", "title", "stats", "national-trust", "privacy", "metadata", "person", "genre"];
-    const isNestedRoute = routeNames.some((route) => path.endsWith(`/${route}`));
-
-    return isNestedRoute ? "../src/" : "./src/";
+    return window.FTS?.Routes?.isNestedRoute?.() ? "../src/" : "./src/";
   }
 
   const sharedScriptBase = getSharedScriptBase();
@@ -88,7 +84,8 @@
   function loadAppHeaderModules() {
     return Promise.all([
       loadSharedScript("app-header-title-search.js", "data-fts-app-header-title-search"),
-      loadSharedScript("app-header-map-search.js", "data-fts-app-header-map-search")
+      loadSharedScript("app-header-map-search.js", "data-fts-app-header-map-search"),
+      loadSharedScript("routes.js", "data-fts-routes")
     ]).then(() => {
       return loadSharedScript("app-header.js", "data-fts-app-header");
     }).then(() => dispatchReady("app-header"));
