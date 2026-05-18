@@ -10,7 +10,12 @@ FTS.Routes = (function () {
     "/privacy",
     "/metadata",
     "/person",
-    "/genre"
+    "/genre",
+    "/films",
+    "/series",
+    "/music-videos",
+    "/games",
+    "/other"
   ];
 
   function path() {
