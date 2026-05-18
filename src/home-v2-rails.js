@@ -12,14 +12,14 @@ FTS.HomeV2Rails = (function () {
   function carouselRail(entries) {
     if (!U.featureEnabled("homeRailCarouselEnabled")) return null;
 
-    const items = entries
+    const items = U.shuffle(entries
       .filter((entry) => U.norm(entry.carousel) !== "")
       .map((entry) => ({
         title: entry.title,
         backdrop: U.safeUrl(entry.backdrop),
         href: U.titleUrl(entry.title)
       }))
-      .filter((entry) => entry.title && entry.backdrop);
+      .filter((entry) => entry.title && entry.backdrop));
 
     if (!items.length) return null;
 
