@@ -10,16 +10,17 @@ FTS.HomeV2Rails = (function () {
   }
 
   function browseRail() {
+    if (!U.featureEnabled("homeRailCategoriesEnabled")) return null;
+
     return {
-      title: "Browse",
+      title: "Categories",
       variant: "buttons",
       items: [
         { title: "Films", href: "./films/" },
         { title: "Series", href: "./series/" },
         { title: "Music Videos", href: "./music-videos/" },
         { title: "Games", href: "./games/" },
-        { title: "National Trust", href: "./national-trust/" },
-        { title: "Map", href: "./explore/" }
+        { title: "National Trust", href: "./national-trust/" }
       ]
     };
   }
