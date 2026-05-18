@@ -202,7 +202,7 @@
       document.title = `${genre} | Find That Scene`;
 
       document.getElementById("genreTitle").textContent = genre;
-      document.getElementById("genreCopy").textContent = `Appears in ${matches.length} title${matches.length === 1 ? "" : "s"} with scenes found.`;
+      document.getElementById("genreCopy").textContent = `${matches.length} title${matches.length === 1 ? "" : "s"} with scenes found.`;
 
       const grid = document.getElementById("genreGrid");
       renderGroupedPosters(grid, matches, type);
