@@ -20,9 +20,15 @@ FTS.HomeV2Renderer = (function () {
         min-width: 0;
       }
 
+      .rail-link,
+      .rail-title-link {
+        padding: 4px 8px;
+      }
+
       .rail-link-icon {
         width: 38px;
         height: 38px;
+        padding: 4px 8px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -33,6 +39,7 @@ FTS.HomeV2Renderer = (function () {
         color: #6f42c1;
         text-decoration: none;
         flex: 0 0 auto;
+        box-sizing: border-box;
       }
 
       .rail-link-icon svg {
