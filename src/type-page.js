@@ -81,6 +81,20 @@
     return rowsToObjects(parseCSV(await response.text()));
   }
 
+  function ensureFallbackStyles() {
+    if (document.getElementById("fts-type-page-fallback-style")) return;
+
+    const style = document.createElement("style");
+    style.id = "fts-type-page-fallback-style";
+    style.textContent = `
+      .poster-fallback {
+        width: auto;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+
   function posterCard(item) {
     const title = norm(getValue(item, "title"));
     const poster = norm(getValue(item, "poster"));
@@ -99,6 +113,8 @@
   async function boot() {
     const pageConfig = window.FTS_TYPE_PAGE;
     if (!pageConfig) return;
+
+    ensureFallbackStyles();
 
     const rows = await fetchCSV(config.TITLE_METADATA_CSV);
 
