@@ -25,6 +25,58 @@ FTS.HomeV2Renderer = (function () {
         padding: 4px 8px;
       }
 
+      .hero-carousel-row {
+        display: flex;
+        gap: 16px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        scroll-snap-type: x mandatory;
+      }
+
+      .hero-carousel-row::-webkit-scrollbar {
+        display: none;
+      }
+
+      .hero-carousel-card {
+        position: relative;
+        flex: 0 0 100%;
+        aspect-ratio: 3 / 1;
+        border-radius: 26px;
+        overflow: hidden;
+        text-decoration: none;
+        background: #111827;
+        scroll-snap-align: start;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+      }
+
+      .hero-carousel-card img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+
+      .hero-carousel-overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(to top, rgba(0,0,0,0.72), rgba(0,0,0,0.08) 55%, rgba(0,0,0,0));
+        display: flex;
+        align-items: flex-end;
+        padding: 22px;
+        box-sizing: border-box;
+      }
+
+      .hero-carousel-title {
+        color: #fff;
+        font-size: clamp(24px, 4vw, 48px);
+        font-weight: 900;
+        line-height: 0.95;
+        letter-spacing: -0.04em;
+        text-shadow: 0 4px 18px rgba(0,0,0,0.4);
+      }
+
       .rail-link-icon {
         width: 38px;
         height: 38px;
@@ -120,6 +172,23 @@ FTS.HomeV2Renderer = (function () {
     `;
   }
 
+  function carouselRail(railConfig) {
+    return `
+      <section class="rail rail-carousel">
+        <div class="hero-carousel-row poster-row">
+          ${railConfig.items.map((item) => `
+            <a class="hero-carousel-card" href="${U.escapeHtml(item.href)}" aria-label="${U.escapeHtml(item.title)}">
+              <img src="${U.escapeHtml(item.backdrop)}" alt="${U.escapeHtml(item.title)}" loading="lazy" draggable="false">
+              <div class="hero-carousel-overlay">
+                <div class="hero-carousel-title">${U.escapeHtml(item.title)}</div>
+              </div>
+            </a>
+          `).join("")}
+        </div>
+      </section>
+    `;
+  }
+
   function railLink(railConfig) {
     if (!railConfig.href) return "";
 
@@ -154,6 +223,10 @@ FTS.HomeV2Renderer = (function () {
 
   function rail(railConfig) {
     if (!railConfig?.items?.length) return "";
+
+    if (railConfig.variant === "carousel") {
+      return carouselRail(railConfig);
+    }
 
     if (railConfig.variant === "buttons") {
       return buttonRail(railConfig);
