@@ -42,6 +42,27 @@
     return Boolean(norm(metadata.description) || norm(metadata.imdb) || norm(metadata.justwatch) || norm(metadata.poster) || norm(metadata.trailer));
   }
 
+  function waitForShellDependencies(callback) {
+    if (window.FTS?.AppSettings && window.FTS?.Visibility && window.FTS?.Privacy) {
+      callback();
+      return;
+    }
+
+    const startedAt = Date.now();
+    const interval = window.setInterval(() => {
+      if (window.FTS?.AppSettings && window.FTS?.Visibility && window.FTS?.Privacy) {
+        window.clearInterval(interval);
+        callback();
+        return;
+      }
+
+      if (Date.now() - startedAt > 2500) {
+        window.clearInterval(interval);
+        callback();
+      }
+    }, 25);
+  }
+
   function titleSummaryHtml(metadata) {
     if (!metadataHasContent(metadata)) return "";
     const poster = safeUrl(metadata.poster);
@@ -74,7 +95,7 @@
   }
 
   function renderTitlePage(title, rows, metadata) {
-    const visibleRows = FTS.Visibility?.getVisibleScenes?.(rows) || rows;
+    const visibleRows = rows;
     const sortedRows = sortScenes(visibleRows);
     const sceneCount = sortedRows.length;
 
@@ -121,6 +142,26 @@
     `;
   }
 
+  async function loadTitleData() {
+    if (window.FTS?.DataStore?.getScenePacks) {
+      const [scenePacks, metadataRows] = await Promise.all([
+        window.FTS.DataStore.getScenePacks(),
+        window.FTS.DataStore.getTitleMetadata ? window.FTS.DataStore.getTitleMetadata() : loadTitleMetadata()
+      ]);
+
+      const hideNoAccess = window.FTS?.Visibility?.hideNoAccessEnabled?.() === true;
+      return {
+        activeRows: hideNoAccess ? scenePacks.publicScenes : scenePacks.allScenes,
+        allRows: scenePacks.allScenes,
+        metadataRows
+      };
+    }
+
+    const [rows, metadataRows] = await Promise.all([loadAll(), loadTitleMetadata()]);
+    const activeRows = FTS.Visibility?.getVisibleScenes?.(rows) || rows;
+    return { activeRows, allRows: rows, metadataRows };
+  }
+
   async function init() {
     renderLoading();
     const requestedTitle = getRequestedTitle();
@@ -130,19 +171,29 @@
     }
 
     try {
-      const [rows, metadataRows] = await Promise.all([loadAll(), loadTitleMetadata()]);
-      const matches = rows.filter((row) => normalizeComparable(row.title) === normalizeComparable(requestedTitle));
-      if (!matches.length) {
+      const { activeRows, allRows, metadataRows } = await loadTitleData();
+      const activeMatches = activeRows.filter((row) => normalizeComparable(row.title) === normalizeComparable(requestedTitle));
+      const allMatches = allRows.filter((row) => normalizeComparable(row.title) === normalizeComparable(requestedTitle));
+
+      if (!allMatches.length) {
         redirectTo404("title-not-found", requestedTitle);
         return;
       }
-      const metadata = titleMetadataMap(metadataRows).get(normalizeComparable(matches[0].title));
-      renderTitlePage(matches[0].title, matches, metadata);
+
+      const title = allMatches[0].title;
+      const metadata = titleMetadataMap(metadataRows).get(normalizeComparable(title));
+
+      if (!activeMatches.length) {
+        renderNoVisibleScenes(title);
+        return;
+      }
+
+      renderTitlePage(title, activeMatches, metadata);
     } catch (err) {
       console.error(err);
       contentEl.innerHTML = `<div class="empty-card">Could not load this title.</div>`;
     }
   }
 
-  init();
+  waitForShellDependencies(init);
 })();
