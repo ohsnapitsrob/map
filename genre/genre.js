@@ -9,18 +9,27 @@
   function sectionLabel(key) { if (key === "movies") return "Films"; if (key === "tv") return "Series"; return "Other"; }
   function parseCSV(text) { const rows = []; let row = []; let current = ""; let inQuotes = false; for (let i = 0; i < text.length; i++) { const character = text[i]; const next = text[i + 1]; if (character === '"' && inQuotes && next === '"') { current += '"'; i++; continue; } if (character === '"') { inQuotes = !inQuotes; continue; } if (character === "," && !inQuotes) { row.push(current); current = ""; continue; } if ((character === "\n" || character === "\r") && !inQuotes) { if (character === "\r" && next === "\n") i++; row.push(current); current = ""; if (row.length > 1 || row[0] !== "") rows.push(row); row = []; continue; } current += character; } row.push(current); if (row.length > 1 || row[0] !== "") rows.push(row); return rows; }
   function rowsToObjects(rows) { if (!rows.length) return []; const headers = rows[0].map(normalise); return rows.slice(1).map((row) => { const obj = {}; headers.forEach((header, index) => { obj[header] = row[index] || ""; }); return obj; }); }
-  async function fetchCSV(url) {
-    if (!url) return [];
+
+  async function fetchMetadataRows() {
+    if (window.FTS?.DataStore?.getTitleMetadata) {
+      return window.FTS.DataStore.getTitleMetadata();
+    }
+
+    if (window.FTS?.DataStore?.csvRows) {
+      return window.FTS.DataStore.csvRows("title-metadata", config.TITLE_METADATA_CSV);
+    }
 
     if (window.FTS?.DataCache?.fetchCSV) {
-      const result = await window.FTS.DataCache.fetchCSV(url);
+      const result = await window.FTS.DataCache.fetchCSV(config.TITLE_METADATA_CSV);
       return result.rows;
     }
 
-    const response = await fetch(url, { cache: "no-store" });
-    if (!response.ok) throw new Error(`Could not load CSV: ${url}`);
+    const response = await fetch(config.TITLE_METADATA_CSV, { cache: "no-store" });
+    if (!response.ok) throw new Error(`Could not load CSV: ${config.TITLE_METADATA_CSV}`);
+
     return rowsToObjects(parseCSV(await response.text()));
   }
+
   function redirectTo404(reason) { const params = new URLSearchParams(); params.set("env-guard", reason || "genre"); window.location.replace(`/404.html?${params.toString()}`); }
   function posterCard(item) { const title = normalise(getValue(item, "title")); const poster = normalise(getValue(item, "poster")); if (!title) return ""; return `<a class="person-card" href="../title/?fl=${encodeURIComponent(title)}" aria-label="${title}"><div class="poster-card">${poster ? `<img src="${poster}" alt="${title}" loading="lazy">` : `<div class="poster-fallback">${title}</div>`}</div></a>`; }
   async function getVisibleTitleKeys() { if (window.FTS?.TitleVisibility?.visibleTitleKeys) return window.FTS.TitleVisibility.visibleTitleKeys(); return null; }
@@ -33,7 +42,7 @@
     if (!genre) { redirectTo404("genre"); return; }
     const target = normaliseKey(genre);
     try {
-      const [metadata, visibleTitleKeys] = await Promise.all([fetchCSV(config.TITLE_METADATA_CSV), getVisibleTitleKeys()]);
+      const [metadata, visibleTitleKeys] = await Promise.all([fetchMetadataRows(), getVisibleTitleKeys()]);
       const matches = metadata.filter((item) => splitList(getValue(item, "Genres")).map(normaliseKey).includes(target)).filter((item) => !visibleTitleKeys || visibleTitleKeys.has(normaliseKey(getValue(item, "title"))));
       if (!matches.length) { redirectTo404("genre"); return; }
 
