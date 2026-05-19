@@ -207,7 +207,7 @@ FTS.HomeV2Rails = (function () {
     const overlayContext = {
       latestTitles: latest ? titleSet(latest.items) : new Set(),
       topTenTitles: titleSet([...(topFilms?.items || []), ...(topSeries?.items || [])]),
-      noAccessTitles: titleSet(entries.filter((entry) => entry.onlyNoAccess))
+      noAccessTitles: context.noAccessTitleKeys || titleSet(entries.filter((entry) => entry.hasNoAccess || entry.onlyNoAccess))
     };
 
     return [carousel, browseRail(), latest, ...U.shuffle(randomRails), peopleRail(entries, context.peopleRows), gamesRail(entries)].filter(Boolean).map((rail) => ({ ...overlayContext, ...rail }));
