@@ -3,6 +3,7 @@ window.FTS = window.FTS || {};
 FTS.DataCache = (function () {
   const CACHE_VERSION = "v1";
   const CACHE_PREFIX = "fts:csv";
+  const STAGING_CACHE_SETTING_KEY = "fts:staging-cache-enabled";
 
   function getRuntimeConfig() {
     return window.RUNTIME_CONFIG || {};
@@ -25,10 +26,32 @@ FTS.DataCache = (function () {
     return p.has("cacheBust") || p.has("cacheBuster") || p.has("ftsRefresh") || p.has("refreshData");
   }
 
+  function stagingCacheEnabled() {
+    if (!isStaging()) return false;
+
+    try {
+      return localStorage.getItem(STAGING_CACHE_SETTING_KEY) === "true";
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function setStagingCacheEnabled(enabled) {
+    try {
+      localStorage.setItem(STAGING_CACHE_SETTING_KEY, enabled ? "true" : "false");
+    } catch (err) {
+      // Ignore storage failures.
+    }
+  }
+
   function cacheEnabled(options = {}) {
     if (options.cache === false) return false;
     if (hasCacheBuster()) return false;
-    if (isStaging() && options.allowStagingCache !== true) return false;
+
+    if (isStaging()) {
+      return stagingCacheEnabled();
+    }
+
     return true;
   }
 
@@ -140,6 +163,45 @@ FTS.DataCache = (function () {
     }).filter((row) => Object.values(row).some((value) => norm(value) !== ""));
   }
 
+  function renderStagingToggle() {
+    if (!isStaging()) return;
+    if (document.getElementById("fts-staging-cache-toggle")) return;
+
+    const toggle = document.createElement("button");
+    toggle.id = "fts-staging-cache-toggle";
+
+    function updateLabel() {
+      const enabled = stagingCacheEnabled();
+      toggle.textContent = `Cache ${enabled ? "ON" : "OFF"}`;
+      toggle.style.background = enabled ? "#14532d" : "#3f3f46";
+    }
+
+    toggle.setAttribute("type", "button");
+    toggle.style.position = "fixed";
+    toggle.style.right = "16px";
+    toggle.style.bottom = "84px";
+    toggle.style.zIndex = "99999";
+    toggle.style.border = "0";
+    toggle.style.borderRadius = "999px";
+    toggle.style.padding = "10px 14px";
+    toggle.style.color = "#fff";
+    toggle.style.font = "600 12px Poppins, sans-serif";
+    toggle.style.boxShadow = "0 8px 24px rgba(0,0,0,.22)";
+    toggle.style.cursor = "pointer";
+
+    updateLabel();
+
+    toggle.addEventListener("click", () => {
+      const next = !stagingCacheEnabled();
+      setStagingCacheEnabled(next);
+      updateLabel();
+
+      console.info(`[FTS Cache] staging cache ${next ? "enabled" : "disabled"}`);
+    });
+
+    document.body.appendChild(toggle);
+  }
+
   async function fetchText(url, options = {}) {
     const bucket = hourlyBucket();
     const key = cacheKey(url, bucket);
@@ -189,6 +251,12 @@ FTS.DataCache = (function () {
     return { ...result, rows };
   }
 
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", renderStagingToggle, { once: true });
+  } else {
+    renderStagingToggle();
+  }
+
   return {
     fetchText,
     fetchCSV,
@@ -196,6 +264,8 @@ FTS.DataCache = (function () {
     cacheKey,
     cacheEnabled,
     hasCacheBuster,
-    isStaging
+    isStaging,
+    stagingCacheEnabled,
+    setStagingCacheEnabled
   };
 })();
