@@ -99,6 +99,11 @@
   async function fetchCSV(url) {
     if (!url) return [];
 
+    if (window.FTS?.DataCache?.fetchCSV) {
+      const result = await window.FTS.DataCache.fetchCSV(url);
+      return result.rows;
+    }
+
     const response = await fetch(url, { cache: "no-store" });
     if (!response.ok) throw new Error(`Could not load CSV: ${url}`);
 
@@ -202,6 +207,22 @@
 
       const personPhoto = normalise(getValue(personEntry || {}, "photo"));
 
+      const shell = document.querySelector(".person-shell");
+      if (shell) {
+        shell.innerHTML = `
+          <section class="person-hero">
+            <div class="person-photo" id="personPhoto" aria-hidden="true"></div>
+            <div class="person-hero-copy">
+              <h1 class="person-title" id="personTitle"></h1>
+              <p class="person-copy" id="personCopy"></p>
+            </div>
+          </section>
+          <section>
+            <div class="person-grid" id="personGrid"></div>
+          </section>
+        `;
+      }
+
       if (personPhoto) {
         const photoContainer = document.getElementById("personPhoto");
 
@@ -210,9 +231,6 @@
       }
 
       document.title = `${label} | Find That Scene`;
-
-      const kicker = document.getElementById("personKicker");
-      if (kicker) kicker.remove();
 
       document.getElementById("personTitle").textContent = label;
       document.getElementById("personCopy").textContent = `Involved in ${matches.length} title${matches.length === 1 ? "" : "s"} with scenes found.`;
