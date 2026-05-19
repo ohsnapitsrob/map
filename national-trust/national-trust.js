@@ -47,13 +47,13 @@
     });
 
     const balanced = [];
-    const groups = Array.from(byTitle.values());
+    const titleGroups = Array.from(byTitle.values()).map((group) => [...group]);
     let added = true;
 
     while (added) {
       added = false;
 
-      groups.forEach((group) => {
+      titleGroups.forEach((group) => {
         const next = group.shift();
         if (!next) return;
         balanced.push(next);
@@ -72,6 +72,7 @@
       if (!name) return;
 
       const groupKey = key(name);
+
       if (!groups.has(groupKey)) {
         groups.set(groupKey, {
           name,
@@ -82,7 +83,10 @@
 
       const group = groups.get(groupKey);
       group.scenes.push(scene);
-      if (!group.url) group.url = getNationalTrustUrl(scene);
+
+      if (!group.url) {
+        group.url = getNationalTrustUrl(scene);
+      }
     });
 
     return Array.from(groups.values())
@@ -98,7 +102,7 @@
     if (!url) return "";
 
     return `
-      <a class="nt-discover-btn" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">
+      <a class="location-discover-btn" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">
         Discover more about this location
       </a>
     `;
@@ -110,17 +114,17 @@
     const hiddenId = `nt-hidden-${index}`;
 
     return `
-      <div class="scene-grid nt-scene-grid">
+      <div class="scene-grid nt-visible-scenes">
         ${visibleScenes.map((scene) => window.FTS.SceneCard.render(scene)).join("")}
       </div>
 
       ${hiddenScenes.length ? `
-        <div id="${hiddenId}" class="scene-grid nt-scene-grid nt-hidden-scenes" hidden>
+        <div id="${hiddenId}" class="scene-grid nt-hidden-scenes" hidden>
           ${hiddenScenes.map((scene) => window.FTS.SceneCard.render(scene)).join("")}
         </div>
 
-        <button class="btn btn-secondary nt-see-all" type="button" data-nt-expand="${hiddenId}">
-          See all ${group.scenes.length} titles
+        <button class="btn btn-secondary nt-show-all" type="button" data-nt-expand="${hiddenId}">
+          See all ${group.scenes.length} scenes
         </button>
       ` : ""}
     `;
@@ -139,13 +143,11 @@
     }
 
     contentEl.innerHTML = groups.map((group, index) => `
-      <section class="nt-group">
-        <div class="nt-group-header">
-          <div>
-            <h2>${escapeHtml(group.name)}</h2>
-            <p class="meta">${group.scenes.length} scene${group.scenes.length === 1 ? "" : "s"} found here.</p>
-            ${discoverButton(group)}
-          </div>
+      <section class="nt-location">
+        <div class="nt-location-head">
+          <h2 class="nt-location-title">${escapeHtml(group.name)}</h2>
+          <p class="nt-location-meta">${group.scenes.length} scene${group.scenes.length === 1 ? "" : "s"} found here.</p>
+          ${discoverButton(group)}
         </div>
 
         ${sceneGrid(group, index)}
@@ -156,6 +158,7 @@
       button.addEventListener("click", () => {
         const target = document.getElementById(button.getAttribute("data-nt-expand"));
         if (!target) return;
+
         target.hidden = false;
         button.remove();
       });
