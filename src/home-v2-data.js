@@ -5,7 +5,9 @@ FTS.HomeV2Data = (function () {
 
   async function loadTitleMetadata() {
     const cfg = window.APP_CONFIG || {};
-    const rows = await U.fetchRows(cfg.TITLE_METADATA_CSV || cfg.TITLE_METADATA || cfg.TITLES_METADATA_CSV).catch(() => []);
+    const rows = window.FTS?.DataStore?.getTitleMetadata
+      ? await window.FTS.DataStore.getTitleMetadata().catch(() => [])
+      : await U.fetchRows(cfg.TITLE_METADATA_CSV || cfg.TITLE_METADATA || cfg.TITLES_METADATA_CSV).catch(() => []);
 
     return rows.map((row) => ({
       title: U.norm(row.title),
@@ -28,6 +30,9 @@ FTS.HomeV2Data = (function () {
 
   async function loadPeopleRows() {
     const cfg = window.APP_CONFIG || {};
+    if (window.FTS?.DataStore?.csvRows) {
+      return window.FTS.DataStore.csvRows("people-rows", cfg.PEOPLE_CSV).catch(() => []);
+    }
     return U.fetchRows(cfg.PEOPLE_CSV).catch(() => []);
   }
 
@@ -35,15 +40,17 @@ FTS.HomeV2Data = (function () {
     const cfg = window.APP_CONFIG || {};
     const sheets = cfg.SHEETS || {};
     const sources = [
-      ["Film", sheets.movies],
-      ["TV", sheets.tv],
-      ["Music Video", sheets.music_videos],
-      ["Video Game", sheets.games],
-      ["Misc", sheets.misc]
+      ["Film", sheets.movies, "scene-rows-films"],
+      ["TV", sheets.tv, "scene-rows-tv"],
+      ["Music Video", sheets.music_videos, "scene-rows-music-videos"],
+      ["Video Game", sheets.games, "scene-rows-games"],
+      ["Misc", sheets.misc, "scene-rows-misc"]
     ].filter(([, url]) => Boolean(url));
 
-    const groups = await Promise.all(sources.map(async ([fallbackType, url]) => {
-      const rows = await U.fetchRows(url);
+    const groups = await Promise.all(sources.map(async ([fallbackType, url, cacheKey]) => {
+      const rows = window.FTS?.DataStore?.csvRows
+        ? await window.FTS.DataStore.csvRows(cacheKey, url)
+        : await U.fetchRows(url);
       return rows.map((row) => {
         const title = U.norm(row.title);
         const lat = U.coerceNumber(row.lat);
@@ -115,7 +122,7 @@ FTS.HomeV2Data = (function () {
     }));
   }
 
-  async function load() {
+  async function buildHomepageData() {
     const [sceneRows, metadataRows, peopleRows] = await Promise.all([
       loadSceneRows(),
       loadTitleMetadata(),
@@ -131,6 +138,14 @@ FTS.HomeV2Data = (function () {
       peopleRows,
       entries: buildEntries(visibleRows, metadataRows)
     };
+  }
+
+  async function load() {
+    if (window.FTS?.DataStore?.getHomepageDatasets) {
+      return window.FTS.DataStore.getHomepageDatasets(buildHomepageData);
+    }
+
+    return buildHomepageData();
   }
 
   return { load };
