@@ -376,20 +376,26 @@ p {
   font-size: 14px;
 }
 
-.scene-nt-btn {
-  width: 42px;
-  min-width: 42px;
-  height: 42px;
-  padding: 0;
+.scene-card .scene-actions .scene-nt-btn {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+  inline-size: fit-content;
+  min-height: 40px;
+  height: 40px;
+  padding: 8px;
+  aspect-ratio: 1;
   border-radius: 12px;
   background: #fff;
   border: 2px solid var(--purple);
   box-shadow: none;
 }
 
-.scene-nt-btn img {
-  width: 24px;
-  height: 24px;
+.scene-card .scene-actions .scene-nt-btn img {
+  display: block;
+  width: 22px;
+  height: 22px;
+  max-width: 22px;
   object-fit: contain;
 }
 
@@ -440,8 +446,12 @@ p {
     width: 100%;
   }
 
-  .scene-nt-btn {
-    width: 42px;
-    min-width: 42px;
+  .scene-card .scene-actions .scene-nt-btn {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 0;
+    inline-size: fit-content;
+    max-width: fit-content;
+    padding: 8px;
   }
 }
