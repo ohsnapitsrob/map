@@ -57,6 +57,26 @@
     if (!response.ok) throw new Error(`Could not load ${config.TITLE_METADATA_CSV}`);
     return rowsToObjects(parseCSV(await response.text()));
   }
+  function waitForShellDependencies(callback) {
+    if (window.FTS?.AppSettings && window.FTS?.Visibility) {
+      callback();
+      return;
+    }
+
+    const startedAt = Date.now();
+    const interval = window.setInterval(() => {
+      if (window.FTS?.AppSettings && window.FTS?.Visibility) {
+        window.clearInterval(interval);
+        callback();
+        return;
+      }
+
+      if (Date.now() - startedAt > 2500) {
+        window.clearInterval(interval);
+        callback();
+      }
+    }, 25);
+  }
   function ensureFallbackStyles() {
     if (document.getElementById("fts-type-page-fallback-style")) return;
     const style = document.createElement("style");
@@ -110,5 +130,5 @@
     document.title = `${pageConfig.label} | Find That Scene`;
     renderReady(pageConfig, matches);
   }
-  boot();
+  waitForShellDependencies(boot);
 })();
