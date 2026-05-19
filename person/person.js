@@ -19,6 +19,13 @@
     return window.FTS?.Utils?.splitComma ? window.FTS.Utils.splitComma(value) : norm(value).split(",").map(norm).filter(Boolean);
   }
 
+  function redirectTo404(reason, value = "") {
+    const params = new URLSearchParams();
+    params.set("person-error", reason);
+    if (value) params.set("value", value);
+    window.location.replace(`../404.html?${params.toString()}`);
+  }
+
   function getParamNames() {
     const params = new URLSearchParams(window.location.search);
     return {
@@ -88,9 +95,7 @@
     const mode = requestedMode();
 
     if (!person) {
-      titleEl.textContent = "Person";
-      copyEl.textContent = "No person was selected.";
-      contentEl.innerHTML = "";
+      redirectTo404("missing-person-param");
       return;
     }
 
