@@ -320,24 +320,28 @@ App.Data = (function () {
       let locs = [];
 
       if (hasSheets) {
-        const sources = [
-          ["Film", sheets.movies],
-          ["TV", sheets.tv],
-          ["Music Video", sheets.music_videos],
-          ["Video Game", sheets.games],
-          ["Misc", sheets.misc]
-        ].filter(([, url]) => !!url);
+        if (window.FTS?.DataStore?.getSceneRows) {
+          locs = await window.FTS.DataStore.getSceneRows();
+        } else {
+          const sources = [
+            ["Film", sheets.movies],
+            ["TV", sheets.tv],
+            ["Music Video", sheets.music_videos],
+            ["Video Game", sheets.games],
+            ["Misc", sheets.misc]
+          ].filter(([, url]) => !!url);
 
-        const texts = await Promise.all(sources.map(([, url]) => fetchSheetCSV(url)));
+          const texts = await Promise.all(sources.map(([, url]) => fetchSheetCSV(url)));
 
-        for (let i = 0; i < sources.length; i++) {
-          const [fallbackType] = sources[i];
-          const rows = rowsToObjects(parseCSV(texts[i]));
+          for (let i = 0; i < sources.length; i++) {
+            const [fallbackType] = sources[i];
+            const rows = rowsToObjects(parseCSV(texts[i]));
 
-          rows.forEach((r) => {
-            const loc = postProcessRow(r, fallbackType);
-            if (loc) locs.push(loc);
-          });
+            rows.forEach((r) => {
+              const loc = postProcessRow(r, fallbackType);
+              if (loc) locs.push(loc);
+            });
+          }
         }
       } else {
         const r = await fetch("./data/locations.json");
@@ -366,7 +370,8 @@ App.Data = (function () {
 
       window.addEventListener("fts:app-settings-updated", async () => {
         if (window.FTS?.DataStore?.clear) {
-          window.FTS.DataStore.clear("explore-search-indexes");
+          window.FTS.DataStore.clear("explore-search-indexes:all");
+          window.FTS.DataStore.clear("explore-search-indexes:public-only");
         }
 
         await buildSearchIndexes();
