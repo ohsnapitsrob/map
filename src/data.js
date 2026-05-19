@@ -116,6 +116,11 @@ App.Data = (function () {
   }
 
   async function fetchSheetCSV(url) {
+    if (window.FTS?.DataCache?.fetchText) {
+      const result = await window.FTS.DataCache.fetchText(url);
+      return result.text;
+    }
+
     const r = await fetch(url, { cache: "no-store" });
     if (!r.ok) throw new Error(`Failed to fetch CSV: ${url}`);
     return r.text();
