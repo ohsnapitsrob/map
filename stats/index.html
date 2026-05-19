@@ -28,11 +28,16 @@
   </style>
 
   <script src="../runtime-config.js"></script>
-  <script src="../config.js"></script>
-  <script src="../src/feature-toggles.js"></script>
-  <script src="../src/site-content.js"></script>
-  <script src="../src/app-shell.js"></script>
-  <script src="../src/boot.js"></script>
+<script src="../config.js"></script>
+<script src="../src/feature-toggles.js"></script>
+<script src="../src/site-content.js"></script>
+<script src="../src/environment-rules.js"></script>
+<script src="../src/environment-guards.js"></script>
+<script>
+  window.FTS?.EnvironmentGuards?.init?.();
+</script>
+<script src="../src/app-shell.js"></script>
+<script src="../src/boot.js"></script>
 </head>
 <body data-nav-root="../">
   <main class="stats-shell">
