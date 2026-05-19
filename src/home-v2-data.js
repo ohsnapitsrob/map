@@ -80,14 +80,13 @@ FTS.HomeV2Data = (function () {
     return groups.flat();
   }
 
-  function buildEntries(sceneRows, metadataRows, visibility) {
+  function buildEntries(activeRows, metadataRows, scenePacks) {
     const metaByTitle = new Map(metadataRows.map((meta) => [U.key(meta.title), meta]));
     const grouped = new Map();
-    const inaccessibleTitleKeys = visibility?.inaccessibleTitleKeys || new Set();
-    const visibleTitleKeys = visibility?.visibleTitleKeys || new Set();
-    const hideNoAccess = window.FTS?.Visibility?.hideNoAccessEnabled?.() === true;
+    const restrictedTitleKeys = scenePacks?.restrictedTitleKeys || new Set();
+    const onlyRestrictedTitleKeys = scenePacks?.onlyRestrictedTitleKeys || new Set();
 
-    sceneRows.forEach((row) => {
+    activeRows.forEach((row) => {
       const titleKey = U.key(row.title);
       const meta = metaByTitle.get(titleKey) || {};
 
@@ -109,42 +108,29 @@ FTS.HomeV2Data = (function () {
           nt: U.norm(meta.nt),
           genres: U.splitComma(meta.genres),
           stars: U.norm(meta.stars),
-          director: U.norm(meta.director)
+          director: U.norm(meta.director),
+          hasNoAccess: restrictedTitleKeys.has(titleKey),
+          onlyNoAccess: onlyRestrictedTitleKeys.has(titleKey)
         });
       }
 
       const entry = grouped.get(titleKey);
       entry.count += 1;
+      entry.visibleCount += 1;
 
-      if (U.normalizeAccess(row.access) === "NOACCESS") entry.noAccessCount += 1;
-      else entry.visibleCount += 1;
-
+      if (U.normalizeAccess(row.access) !== "") entry.noAccessCount += 1;
       if (U.isUKCountry(row.country)) entry.ukCount += 1;
       if (!entry.series && row.series) entry.series = row.series;
       if (!Number.isFinite(entry.latestVisitedTs) || row.visitedTs > entry.latestVisitedTs) entry.latestVisitedTs = row.visitedTs;
     });
 
-    return Array.from(grouped.values()).map((entry) => {
-      const titleKey = U.key(entry.title);
-      const onlyNoAccess = inaccessibleTitleKeys.has(titleKey) && !visibleTitleKeys.has(titleKey);
-
-      return {
-        ...entry,
-        onlyNoAccess
-      };
-    }).filter((entry) => !(hideNoAccess && entry.onlyNoAccess));
+    return Array.from(grouped.values());
   }
 
-  function buildDerivedDatasets(entries, visibleRows, metadataRows) {
-    const hideNoAccess = window.FTS?.Visibility?.hideNoAccessEnabled?.() === true;
-
-    const visibleTitles = hideNoAccess
-      ? entries.filter((entry) => !entry.onlyNoAccess)
-      : entries;
-
-    const byCountDesc = [...visibleTitles].sort((a, b) => b.visibleCount - a.visibleCount || a.title.localeCompare(b.title));
-    const byLatestDesc = [...visibleTitles].sort((a, b) => (b.latestVisitedTs || 0) - (a.latestVisitedTs || 0) || a.title.localeCompare(b.title));
-    const featuredTitles = U.shuffle(visibleTitles.filter((entry) => entry.carousel && entry.backdrop));
+  function buildDerivedDatasets(entries, activeRows, metadataRows, scenePacks) {
+    const byCountDesc = [...entries].sort((a, b) => b.visibleCount - a.visibleCount || a.title.localeCompare(b.title));
+    const byLatestDesc = [...entries].sort((a, b) => (b.latestVisitedTs || 0) - (a.latestVisitedTs || 0) || a.title.localeCompare(b.title));
+    const featuredTitles = U.shuffle(entries.filter((entry) => entry.carousel && entry.backdrop));
 
     return {
       featuredTitles,
@@ -152,36 +138,45 @@ FTS.HomeV2Data = (function () {
       topTitles: byCountDesc.slice(0, 20),
       collectionRails: [],
       nationalTrustRails: [],
+      noAccessTitleKeys: scenePacks?.restrictedTitleKeys || new Set(),
+      onlyNoAccessTitleKeys: scenePacks?.onlyRestrictedTitleKeys || new Set(),
       homepageCounts: {
-        scenes: visibleRows.length,
-        titles: visibleTitles.length,
+        scenes: activeRows.length,
+        titles: entries.length,
         metadataTitles: metadataRows.length,
-        countries: new Set(visibleRows.map((row) => U.key(row.country)).filter(Boolean)).size,
-        cities: new Set(visibleRows.map((row) => U.key(row.city)).filter(Boolean)).size
+        countries: new Set(activeRows.map((row) => U.key(row.country)).filter(Boolean)).size,
+        cities: new Set(activeRows.map((row) => U.key(row.city)).filter(Boolean)).size
       }
     };
   }
 
   async function buildHomepageData() {
-    const [sceneRows, metadataRows, peopleRows] = await Promise.all([
-      loadSceneRows(),
+    const [metadataRows, peopleRows] = await Promise.all([
       loadTitleMetadata(),
       loadPeopleRows()
     ]);
 
+    const hideNoAccess = window.FTS?.Visibility?.hideNoAccessEnabled?.() === true;
+    const scenePacks = window.FTS?.DataStore?.getScenePacks
+      ? await window.FTS.DataStore.getScenePacks()
+      : null;
+    const sceneRows = scenePacks?.allScenes || await loadSceneRows();
+    const activeRows = scenePacks ? (hideNoAccess ? scenePacks.publicScenes : scenePacks.allScenes) : sceneRows;
+    const restrictedRows = scenePacks?.restrictedScenes || [];
     const visibility = window.FTS?.DataStore?.getVisibilityDatasets
       ? await window.FTS.DataStore.getVisibilityDatasets(sceneRows)
       : null;
-
-    const visibleRows = visibility?.visibleScenes || sceneRows;
-    const entries = buildEntries(sceneRows, metadataRows, visibility);
-    const derived = buildDerivedDatasets(entries, visibleRows, metadataRows);
+    const entries = buildEntries(activeRows, metadataRows, scenePacks);
+    const derived = buildDerivedDatasets(entries, activeRows, metadataRows, scenePacks);
 
     return {
       sceneRows,
-      visibleRows,
+      activeRows,
+      visibleRows: activeRows,
+      restrictedRows,
       metadataRows,
       peopleRows,
+      scenePacks,
       visibility,
       entries,
       ...derived
