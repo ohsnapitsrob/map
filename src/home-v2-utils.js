@@ -1,28 +1,23 @@
 window.FTS = window.FTS || {};
 
 FTS.HomeV2Utils = (function () {
-  function norm(value) { return (value || "").toString().trim(); }
-  function key(value) { return norm(value).toLowerCase(); }
-  function coerceNumber(value) { const n = Number((value ?? "").toString().trim()); return Number.isFinite(n) ? n : null; }
-  function safeUrl(url) { const value = norm(url); if (!value) return ""; try { const parsed = new URL(value); if (parsed.protocol === "http:" || parsed.protocol === "https:") return parsed.href; } catch (err) {} return ""; }
-  function escapeHtml(value) { return norm(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;"); }
-  function splitComma(value) { return norm(value).split(",").map(norm).filter(Boolean); }
+  const SharedUtils = window.FTS?.Utils || {};
+
+  function norm(value) { return SharedUtils.norm ? SharedUtils.norm(value) : (value || "").toString().trim(); }
+  function key(value) { return SharedUtils.normalizeComparable ? SharedUtils.normalizeComparable(value) : norm(value).toLowerCase(); }
+  function coerceNumber(value) { return SharedUtils.coerceNumber ? SharedUtils.coerceNumber(value) : (Number.isFinite(Number((value ?? "").toString().trim())) ? Number((value ?? "").toString().trim()) : null); }
+  function safeUrl(url) { return SharedUtils.safeUrl ? SharedUtils.safeUrl(url) : ""; }
+  function escapeHtml(value) { return SharedUtils.escapeHtml ? SharedUtils.escapeHtml(value) : norm(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;"); }
+  function splitComma(value) { return SharedUtils.splitComma ? SharedUtils.splitComma(value) : norm(value).split(",").map(norm).filter(Boolean); }
 
   function featureEnabled(keyName) { return window.FTS?.Features?.isEnabled(keyName) !== false; }
   function appSettings() { return window.FTS?.AppSettings?.getSettings?.() || {}; }
 
   function normalizeType(value) {
-    const type = key(value);
-    if (!type) return "Misc";
-    if (type === "film" || type === "movie" || type === "movies") return "Film";
-    if (type === "tv" || type === "tv show" || type === "tv shows" || type === "series") return "TV";
-    if (type === "music video" || type === "music videos" || type === "mv") return "Music Video";
-    if (type === "game" || type === "games" || type === "video game" || type === "video games") return "Video Game";
-    if (type === "misc" || type === "other") return "Misc";
-    return norm(value);
+    return SharedUtils.normalizeType ? SharedUtils.normalizeType(value) : norm(value);
   }
 
-  function normalizeAccess(value) { return norm(value).toUpperCase(); }
+  function normalizeAccess(value) { return window.FTS?.Visibility?.normaliseAccess ? window.FTS.Visibility.normaliseAccess(value) : norm(value).toUpperCase(); }
 
   function isUKCountry(value) {
     const country = key(value);
@@ -30,53 +25,15 @@ FTS.HomeV2Utils = (function () {
   }
 
   function parseVisitedDate(value) {
-    const raw = norm(value);
-    if (!raw) return null;
-    const cleaned = raw.replace(/(\d{1,2})(st|nd|rd|th)/gi, "$1");
-    const ts = Date.parse(cleaned);
-    return Number.isFinite(ts) ? ts : null;
-  }
-
-  function parseCSV(text) {
-    const rows = [];
-    let row = [];
-    let current = "";
-    let inQuotes = false;
-
-    for (let i = 0; i < text.length; i++) {
-      const character = text[i];
-      const next = text[i + 1];
-      if (character === '"' && inQuotes && next === '"') { current += '"'; i++; continue; }
-      if (character === '"') { inQuotes = !inQuotes; continue; }
-      if (character === "," && !inQuotes) { row.push(current); current = ""; continue; }
-      if ((character === "\n" || character === "\r") && !inQuotes) {
-        if (character === "\r" && next === "\n") i++;
-        row.push(current);
-        current = "";
-        if (row.length > 1 || row[0] !== "") rows.push(row);
-        row = [];
-        continue;
-      }
-      current += character;
-    }
-
-    row.push(current);
-    if (row.length > 1 || row[0] !== "") rows.push(row);
-    return rows;
-  }
-
-  function rowsToObjects(rows) {
-    if (!rows.length) return [];
-    const headers = rows[0].map(norm);
-    return rows.slice(1).map((row) => {
-      const obj = {};
-      headers.forEach((header, index) => { obj[header] = row[index] || ""; });
-      return obj;
-    }).filter((row) => Object.values(row).some((value) => norm(value) !== ""));
+    return SharedUtils.parseVisitedDate ? SharedUtils.parseVisitedDate(value) : null;
   }
 
   async function fetchRows(url) {
     if (!url) return [];
+
+    if (window.FTS?.CSV?.fetchObjects) {
+      return window.FTS.CSV.fetchObjects(url);
+    }
 
     if (window.FTS?.DataCache?.fetchCSV) {
       const result = await window.FTS.DataCache.fetchCSV(url);
@@ -85,7 +42,8 @@ FTS.HomeV2Utils = (function () {
 
     const response = await fetch(url, { cache: "no-store" });
     if (!response.ok) throw new Error(`Failed to fetch CSV: ${url}`);
-    return rowsToObjects(parseCSV(await response.text()));
+    const text = await response.text();
+    return window.FTS?.CSV?.toObjects ? window.FTS.CSV.toObjects(window.FTS.CSV.parse(text)) : [];
   }
 
   function shuffle(items) {
