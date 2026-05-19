@@ -93,6 +93,20 @@ FTS.DataCache = (function () {
     }
   }
 
+  function clearCache() {
+    if (!canUseStorage()) return;
+
+    try {
+      Object.keys(sessionStorage).forEach((key) => {
+        if (key.startsWith(CACHE_PREFIX)) sessionStorage.removeItem(key);
+      });
+    } catch (err) {
+      // Cache clearing should never block the app.
+    }
+
+    log("cleared csv cache");
+  }
+
   function shouldDebug(options = {}) {
     return isStaging() || options.debug === true;
   }
@@ -263,6 +277,7 @@ FTS.DataCache = (function () {
     hourlyBucket,
     cacheKey,
     cacheEnabled,
+    clearCache,
     hasCacheBuster,
     isStaging,
     stagingCacheEnabled,
