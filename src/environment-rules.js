@@ -7,6 +7,7 @@ FTS.EnvironmentRules = {
   ],
 
   blockedOnStaging: [
+    "/metadata/",
     "/stats/"
   ]
 };
