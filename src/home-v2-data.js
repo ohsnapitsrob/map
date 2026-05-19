@@ -37,6 +37,10 @@ FTS.HomeV2Data = (function () {
   }
 
   async function loadSceneRows() {
+    if (window.FTS?.DataStore?.getSceneRows) {
+      return window.FTS.DataStore.getSceneRows().catch(() => []);
+    }
+
     const cfg = window.APP_CONFIG || {};
     const sheets = cfg.SHEETS || {};
     const sources = [
