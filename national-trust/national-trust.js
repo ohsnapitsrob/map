@@ -1,210 +1,190 @@
 (function () {
-  const {
-    escapeHtml,
-    normalizeComparable,
-    safeUrl,
-    labelForCount
-  } = FTS.Utils;
-
-  const {
-    loadAll,
-    sortScenes
-  } = FTS.Locations;
-
+  const U = window.FTS?.Utils || {};
   const contentEl = document.getElementById("ntContent");
+  const DEFAULT_SHOWN = 3;
 
-  function getVisibleRows(rows) {
-    return FTS.Visibility?.getVisibleScenes?.(rows) || rows;
+  function norm(value) {
+    return U.norm ? U.norm(value) : (value || "").toString().trim();
   }
 
-  function previewOrder(rows) {
-    const sorted = sortScenes(rows);
+  function key(value) {
+    return U.normalizeComparable ? U.normalizeComparable(value) : norm(value).toLowerCase();
+  }
+
+  function escapeHtml(value) {
+    return U.escapeHtml ? U.escapeHtml(value) : norm(value);
+  }
+
+  function safeUrl(value) {
+    return U.safeUrl ? U.safeUrl(value) : norm(value);
+  }
+
+  function getNationalTrustName(row) {
+    return U.getNationalTrustName ? U.getNationalTrustName(row) : norm(row.NationalTrust || row["National Trust"] || row.NT);
+  }
+
+  function getNationalTrustUrl(row) {
+    return U.getNationalTrustUrl ? U.getNationalTrustUrl(row) : norm(row.NTURL || row["NT URL"] || row.nturl);
+  }
+
+  function renderLoading() {
+    if (!contentEl) return;
+    contentEl.innerHTML = `<section class="type-loading-stage"><div class="fts-loader" aria-label="Loading"></div></section>`;
+  }
+
+  function sceneTitleKey(scene) {
+    return key(scene.title);
+  }
+
+  function balanceScenesByTitle(scenes) {
     const byTitle = new Map();
 
-    sorted.forEach((row) => {
-      const key = normalizeComparable(row.title);
-
-      if (!byTitle.has(key)) {
-        byTitle.set(key, []);
-      }
-
-      byTitle.get(key).push(row);
+    scenes.forEach((scene) => {
+      const titleKey = sceneTitleKey(scene);
+      if (!titleKey) return;
+      if (!byTitle.has(titleKey)) byTitle.set(titleKey, []);
+      byTitle.get(titleKey).push(scene);
     });
 
-    const ordered = [];
+    const balanced = [];
+    const groups = Array.from(byTitle.values());
     let added = true;
 
     while (added) {
       added = false;
 
-      byTitle.forEach((items) => {
-        const next = items.shift();
-
-        if (next) {
-          ordered.push(next);
-          added = true;
-        }
+      groups.forEach((group) => {
+        const next = group.shift();
+        if (!next) return;
+        balanced.push(next);
+        added = true;
       });
     }
 
-    return ordered;
+    return balanced;
   }
 
-  function countText(sceneCount, productionCount) {
-    return `${sceneCount.toLocaleString()} ${labelForCount(sceneCount, "scene", "scenes")} from ${productionCount.toLocaleString()} ${labelForCount(productionCount, "title", "titles")}`;
+  function groupedByProperty(rows) {
+    const groups = new Map();
+
+    rows.forEach((scene) => {
+      const name = getNationalTrustName(scene);
+      if (!name) return;
+
+      const groupKey = key(name);
+      if (!groups.has(groupKey)) {
+        groups.set(groupKey, {
+          name,
+          url: getNationalTrustUrl(scene),
+          scenes: []
+        });
+      }
+
+      const group = groups.get(groupKey);
+      group.scenes.push(scene);
+      if (!group.url) group.url = getNationalTrustUrl(scene);
+    });
+
+    return Array.from(groups.values())
+      .map((group) => ({
+        ...group,
+        scenes: balanceScenesByTitle(group.scenes)
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  function locationDiscoverButton(group) {
-    const firstWithUrl = group.rows.find((row) => safeUrl(row.NTURL));
-
-    if (!firstWithUrl) return "";
+  function discoverButton(group) {
+    const url = safeUrl(group.url);
+    if (!url) return "";
 
     return `
-      <a
-        class="location-discover-btn"
-        href="${escapeHtml(firstWithUrl.NTURL)}"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
+      <a class="nt-discover-btn" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">
         Discover more about this location
       </a>
     `;
   }
 
-  function locationSectionHtml(group, index) {
-    const allScenes = sortScenes(group.rows);
-    const preview = previewOrder(group.rows).slice(0, 3);
-    const hasMore = allScenes.length > preview.length;
+  function sceneGrid(group, index) {
+    const visibleScenes = group.scenes.slice(0, DEFAULT_SHOWN);
+    const hiddenScenes = group.scenes.slice(DEFAULT_SHOWN);
+    const hiddenId = `nt-hidden-${index}`;
 
     return `
-      <section class="nt-location" data-location-index="${index}">
-        <div class="nt-location-head">
-          <h2 class="nt-location-title">
-            ${escapeHtml(group.name)}
-          </h2>
+      <div class="scene-grid nt-scene-grid">
+        ${visibleScenes.map((scene) => window.FTS.SceneCard.render(scene)).join("")}
+      </div>
 
-          <div class="nt-location-meta">
-            ${escapeHtml(countText(group.rows.length, group.productionCount))}
-          </div>
-
-          ${locationDiscoverButton(group)}
+      ${hiddenScenes.length ? `
+        <div id="${hiddenId}" class="scene-grid nt-scene-grid nt-hidden-scenes" hidden>
+          ${hiddenScenes.map((scene) => window.FTS.SceneCard.render(scene)).join("")}
         </div>
 
-        <div
-          class="scene-grid nt-scene-grid"
-          data-scene-grid="${index}"
-        >
-          ${preview.map(FTS.SceneCard.render).join("")}
-        </div>
-
-        ${
-          hasMore
-            ? `
-              <button
-                class="btn btn-secondary nt-show-all"
-                type="button"
-                data-show-all="${index}"
-              >
-                Show all scenes
-              </button>
-            `
-            : ""
-        }
-      </section>
+        <button class="btn btn-secondary nt-see-all" type="button" data-nt-expand="${hiddenId}">
+          See all ${group.scenes.length} titles
+        </button>
+      ` : ""}
     `;
   }
 
-  function groupLocations(rows) {
-    const groups = new Map();
+  function renderGroups(groups) {
+    if (!groups.length) {
+      contentEl.innerHTML = `
+        <div class="empty-card">
+          <div class="kicker">No locations</div>
+          <h2>No National Trust locations to show</h2>
+          <p class="meta">No publicly visible National Trust scenes match your current settings.</p>
+        </div>
+      `;
+      return;
+    }
 
-    rows.forEach((row) => {
-      if (!row.NationalTrust) return;
+    contentEl.innerHTML = groups.map((group, index) => `
+      <section class="nt-group">
+        <div class="nt-group-header">
+          <div>
+            <h2>${escapeHtml(group.name)}</h2>
+            <p class="meta">${group.scenes.length} scene${group.scenes.length === 1 ? "" : "s"} found here.</p>
+            ${discoverButton(group)}
+          </div>
+        </div>
 
-      const key = normalizeComparable(row.NationalTrust);
+        ${sceneGrid(group, index)}
+      </section>
+    `).join("");
 
-      if (!groups.has(key)) {
-        groups.set(key, {
-          name: row.NationalTrust,
-          rows: [],
-          productionTitles: new Set()
-        });
-      }
-
-      const group = groups.get(key);
-
-      group.rows.push(row);
-
-      if (row.title) {
-        group.productionTitles.add(normalizeComparable(row.title));
-      }
-    });
-
-    return [...groups.values()]
-      .map((group) => ({
-        ...group,
-        rows: sortScenes(group.rows),
-        productionCount: group.productionTitles.size
-      }))
-      .filter((group) => group.rows.length > 0)
-      .sort((a, b) => {
-        return a.name.localeCompare(b.name, undefined, {
-          sensitivity: "base"
-        });
+    contentEl.querySelectorAll("[data-nt-expand]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const target = document.getElementById(button.getAttribute("data-nt-expand"));
+        if (!target) return;
+        target.hidden = false;
+        button.remove();
       });
+    });
   }
 
-  function attachShowAllHandlers(groups) {
-    contentEl.addEventListener("click", (event) => {
-      const button = event.target.closest("[data-show-all]");
+  async function loadRows() {
+    await window.FTS?.Boot?.ready?.({ scenePacks: true, locations: true, sceneCard: true });
 
-      if (!button) return;
+    if (window.FTS?.DataStore?.getScenePacks) {
+      const scenePacks = await window.FTS.DataStore.getScenePacks();
+      const hideNoAccess = window.FTS?.Visibility?.hideNoAccessEnabled?.() === true;
+      return hideNoAccess ? scenePacks.publicScenes : scenePacks.allScenes;
+    }
 
-      const index = Number(button.getAttribute("data-show-all"));
-      const group = groups[index];
-
-      if (!group) return;
-
-      const section = button.closest(".nt-location");
-      const grid = section?.querySelector(`[data-scene-grid="${index}"]`);
-
-      if (!grid) return;
-
-      grid.innerHTML = sortScenes(group.rows)
-        .map(FTS.SceneCard.render)
-        .join("");
-
-      button.remove();
-    });
+    const rows = await window.FTS.Locations.loadAll();
+    return window.FTS?.Visibility?.getVisibleScenes?.(rows) || rows;
   }
 
   async function init() {
+    renderLoading();
+
     try {
-      const rows = getVisibleRows(await loadAll({ nationalTrustOnly: true }));
-      const groups = groupLocations(rows);
-
-      if (!groups.length) {
-        contentEl.innerHTML = `
-          <div class="empty-card">
-            No National Trust scenes found yet.
-          </div>
-        `;
-
-        return;
-      }
-
-      contentEl.innerHTML = groups
-        .map((group, index) => locationSectionHtml(group, index))
-        .join("");
-
-      attachShowAllHandlers(groups);
+      const rows = await loadRows();
+      const ntRows = rows.filter((row) => getNationalTrustName(row));
+      renderGroups(groupedByProperty(ntRows));
     } catch (err) {
       console.error(err);
-
-      contentEl.innerHTML = `
-        <div class="loading-card">
-          Could not load National Trust locations.
-        </div>
-      `;
+      contentEl.innerHTML = `<div class="empty-card">Could not load National Trust locations.</div>`;
     }
   }
 
