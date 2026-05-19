@@ -75,6 +75,11 @@ FTS.HomeV2 = (function () {
 
       window.FTS.HomeV2Renderer.render(railsRoot, rails);
       window.FTS.HomeV2Renderer.enableDragging(railsRoot);
+
+      requestAnimationFrame(() => {
+        window.dispatchEvent(new Event("resize"));
+      });
+
       renderStats(context);
 
       if (!rails.length) {
@@ -91,8 +96,14 @@ FTS.HomeV2 = (function () {
 
   function rebuildHomepageDatasets() {
     if (window.FTS?.DataStore?.clear) {
-      window.FTS.DataStore.clear("homepage-datasets");
-      window.FTS.DataStore.clear("visibility-datasets");
+      [
+        "homepage-datasets:all",
+        "homepage-datasets:public-only",
+        "visibility-datasets:all",
+        "visibility-datasets:public-only",
+        "explore-search-indexes:all",
+        "explore-search-indexes:public-only"
+      ].forEach((key) => window.FTS.DataStore.clear(key));
     }
 
     init();
