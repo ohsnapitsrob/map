@@ -9,10 +9,14 @@ FTS.HomeV2Rails = (function () {
     return `${value} ${value === 1 ? single : pluralWord}`;
   }
 
-  function carouselRail(entries) {
+  function carouselRail(entries, featuredTitles) {
     if (!U.featureEnabled("homeRailCarouselEnabled")) return null;
 
-    const items = U.shuffle(entries
+    const source = Array.isArray(featuredTitles) && featuredTitles.length
+      ? featuredTitles
+      : entries;
+
+    const items = U.shuffle(source
       .filter((entry) => U.norm(entry.carousel) !== "")
       .map((entry) => ({
         title: entry.title,
@@ -62,20 +66,28 @@ FTS.HomeV2Rails = (function () {
     return `./genre/?${params.toString()}`;
   }
 
-  function latestRail(entries) {
+  function latestRail(entries, latestTitles) {
     if (!U.featureEnabled("homeRailLatestScenesEnabled")) return null;
 
-    const items = entries.filter((entry) => U.safeUrl(entry.poster)).filter((entry) => Number.isFinite(entry.latestVisitedTs)).sort((a, b) => b.latestVisitedTs - a.latestVisitedTs).slice(0, 12);
+    const items = Array.isArray(latestTitles) && latestTitles.length
+      ? latestTitles.slice(0, 12)
+      : entries.filter((entry) => U.safeUrl(entry.poster)).filter((entry) => Number.isFinite(entry.latestVisitedTs)).sort((a, b) => b.latestVisitedTs - a.latestVisitedTs).slice(0, 12);
+
     if (!items.length) return null;
 
     return { title: "Latest", subHeader: `${plural(items.length, "title", "titles")} with new scenes added`, items, suppressOverlays: true };
   }
 
-  function topUKRail(entries, type) {
+  function topUKRail(entries, type, topTitles) {
     if (!U.featureEnabled("homeRailTopScenesEnabled")) return null;
 
     const label = type === "Film" ? "Films" : "Series";
-    const items = entries.filter((entry) => U.safeUrl(entry.poster)).filter((entry) => U.normalizeType(entry.type) === type).filter((entry) => entry.ukCount > 0).sort((a, b) => b.ukCount - a.ukCount || a.title.localeCompare(b.title)).slice(0, 10);
+
+    const source = Array.isArray(topTitles) && topTitles.length
+      ? topTitles
+      : entries;
+
+    const items = source.filter((entry) => U.safeUrl(entry.poster)).filter((entry) => U.normalizeType(entry.type) === type).filter((entry) => entry.ukCount > 0).sort((a, b) => b.ukCount - a.ukCount || a.title.localeCompare(b.title)).slice(0, 10);
     if (!items.length) return null;
 
     return { title: `Top 10 ${label} in the UK`, subHeader: `Top 10 titles based on number of scenes visited`, items, suppressOverlays: true };
@@ -182,10 +194,10 @@ FTS.HomeV2Rails = (function () {
 
   function build(context) {
     const entries = context.entries || [];
-    const carousel = carouselRail(entries);
-    const latest = latestRail(entries);
-    const topFilms = topUKRail(entries, "Film");
-    const topSeries = topUKRail(entries, "TV");
+    const carousel = carouselRail(entries, context.featuredTitles);
+    const latest = latestRail(entries, context.latestTitles);
+    const topFilms = topUKRail(entries, "Film", context.topTitles);
+    const topSeries = topUKRail(entries, "TV", context.topTitles);
     const jamesBond = franchiseRail(entries, "James Bond", { toggleKey: "homeRailJamesBondEnabled", direction: "desc" });
     const harryPotter = franchiseRail(entries, "Harry Potter", { toggleKey: "homeRailHarryPotterEnabled", direction: "asc" });
     const nationalTrust = nationalTrustRail(entries);
