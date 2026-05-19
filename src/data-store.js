@@ -194,6 +194,12 @@ FTS.DataStore = (function () {
       const result = await builder();
 
       return {
+        ...result,
+        sceneRows: result.sceneRows || [],
+        visibleRows: result.visibleRows || [],
+        metadataRows: result.metadataRows || [],
+        peopleRows: result.peopleRows || [],
+        entries: result.entries || [],
         featuredTitles: result.featuredTitles || [],
         latestTitles: result.latestTitles || [],
         topTitles: result.topTitles || [],
