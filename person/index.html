@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../src/loader.css">
   <link rel="stylesheet" href="../home.css">
   <style>
     .person-shell { width: min(1240px,100%); margin:0 auto; padding:22px 18px 56px; display:grid; gap:26px; }
@@ -27,6 +28,7 @@
     .person-card .poster-card img { width:100%; }
     .person-card-title { font-size:13px; font-weight:850; line-height:1.2; }
     .person-empty { background:#fff; border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:var(--shadow-card); padding:20px; color:#555; }
+    .person-loading-stage { min-height:260px; display:grid; place-items:center; }
     @media (max-width: 560px) { .person-hero { grid-template-columns:auto minmax(0,1fr); gap:14px; padding:20px; } .person-photo { width:82px; } .person-grid-section { grid-template-columns:repeat(auto-fill,minmax(118px,1fr)); gap:14px; } }
   </style>
   <script src="../runtime-config.js"></script>
@@ -35,24 +37,13 @@
   <script src="../src/site-content.js"></script>
   <script src="../src/environment-rules.js"></script>
   <script src="../src/environment-guards.js"></script>
-  <script>
-    window.FTS?.EnvironmentGuards?.init?.();
-  </script>
+  <script>window.FTS?.EnvironmentGuards?.init?.();</script>
   <script src="../src/app-shell.js"></script>
+  <script src="../src/data-cache.js"></script>
 </head>
-<body>
+<body data-nav-root="../">
   <main class="person-shell">
-    <section class="person-hero">
-      <div class="person-photo" id="personPhoto" aria-hidden="true"></div>
-      <div class="person-hero-copy">
-        <p class="person-kicker" id="personKicker">Person</p>
-        <h1 class="person-title" id="personTitle">Loading…</h1>
-        <p class="person-copy" id="personCopy">Finding matching titles from the metadata archive.</p>
-      </div>
-    </section>
-    <section>
-      <div class="person-grid" id="personGrid"></div>
-    </section>
+    <section class="person-loading-stage"><div class="fts-loader" aria-label="Loading"></div></section>
   </main>
   <script src="./person.js"></script>
 </body>
