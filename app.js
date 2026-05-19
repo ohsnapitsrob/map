@@ -1,8 +1,10 @@
 // app.js (boot)
 window.App = window.App || {};
 
-(function boot() {
+(async function boot() {
   try {
+    await window.FTS?.Boot?.ready?.({ scenePacks: true });
+
     App.State.init();
     App.Router.init();
 
@@ -13,10 +15,9 @@ window.App = window.App || {};
     App.UI.init();
     App.Search.init();
 
-    // ✅ NEW: tells Router it can now safely apply URL state that calls UI/Search
     App.Router.setUiReady();
 
-    App.Data.init();
+    await App.Data.init();
   } catch (e) {
     console.error(e);
     alert("App failed to start. Check console for details.");
