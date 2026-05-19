@@ -1,71 +1,102 @@
 (function () {
-  const config = window.APP_CONFIG || {};
+  const titleEl = document.getElementById("genreTitle");
+  const copyEl = document.getElementById("genreCopy");
+  const gridEl = document.getElementById("genreGrid");
 
-  function normalise(value) { return (value || "").toString().trim(); }
-  function normaliseKey(value) { return normalise(value).toLowerCase(); }
-  function getValue(row, key) { const target = normaliseKey(key); const matchedKey = Object.keys(row).find((rowKey) => normaliseKey(rowKey) === target); return matchedKey ? row[matchedKey] : ""; }
-  function splitList(value) { return normalise(value).split(",").map((item) => item.trim()).filter(Boolean); }
-  function normaliseType(value) { const type = normaliseKey(value); if (type === "film" || type === "films" || type === "movie" || type === "movies") return "movies"; if (type === "tv" || type === "tv show" || type === "tv shows" || type === "series") return "tv"; return "other"; }
-  function sectionLabel(key) { if (key === "movies") return "Films"; if (key === "tv") return "Series"; return "Other"; }
-  function parseCSV(text) { const rows = []; let row = []; let current = ""; let inQuotes = false; for (let i = 0; i < text.length; i++) { const character = text[i]; const next = text[i + 1]; if (character === '"' && inQuotes && next === '"') { current += '"'; i++; continue; } if (character === '"') { inQuotes = !inQuotes; continue; } if (character === "," && !inQuotes) { row.push(current); current = ""; continue; } if ((character === "\n" || character === "\r") && !inQuotes) { if (character === "\r" && next === "\n") i++; row.push(current); current = ""; if (row.length > 1 || row[0] !== "") rows.push(row); row = []; continue; } current += character; } row.push(current); if (row.length > 1 || row[0] !== "") rows.push(row); return rows; }
-  function rowsToObjects(rows) { if (!rows.length) return []; const headers = rows[0].map(normalise); return rows.slice(1).map((row) => { const obj = {}; headers.forEach((header, index) => { obj[header] = row[index] || ""; }); return obj; }); }
-
-  async function fetchMetadataRows() {
-    if (window.FTS?.DataStore?.getTitleMetadata) {
-      return window.FTS.DataStore.getTitleMetadata();
-    }
-
-    if (window.FTS?.DataStore?.csvRows) {
-      return window.FTS.DataStore.csvRows("title-metadata", config.TITLE_METADATA_CSV);
-    }
-
-    if (window.FTS?.DataCache?.fetchCSV) {
-      const result = await window.FTS.DataCache.fetchCSV(config.TITLE_METADATA_CSV);
-      return result.rows;
-    }
-
-    const response = await fetch(config.TITLE_METADATA_CSV, { cache: "no-store" });
-    if (!response.ok) throw new Error(`Could not load CSV: ${config.TITLE_METADATA_CSV}`);
-
-    return rowsToObjects(parseCSV(await response.text()));
+  function norm(value) {
+    return window.FTS?.Utils?.norm ? window.FTS.Utils.norm(value) : (value || "").toString().trim();
   }
 
-  function redirectTo404(reason) { const params = new URLSearchParams(); params.set("env-guard", reason || "genre"); window.location.replace(`/404.html?${params.toString()}`); }
-  function posterCard(item) { const title = normalise(getValue(item, "title")); const poster = normalise(getValue(item, "poster")); if (!title) return ""; return `<a class="person-card" href="../title/?fl=${encodeURIComponent(title)}" aria-label="${title}"><div class="poster-card">${poster ? `<img src="${poster}" alt="${title}" loading="lazy">` : `<div class="poster-fallback">${title}</div>`}</div></a>`; }
-  async function getVisibleTitleKeys() { if (window.FTS?.TitleVisibility?.visibleTitleKeys) return window.FTS.TitleVisibility.visibleTitleKeys(); return null; }
-  function renderGroupedPosters(grid, matches, priorityType) { const groups = new Map([["movies", []], ["tv", []], ["other", []]]); matches.forEach((item) => { const title = normalise(getValue(item, "title")); if (!title) return; const groupKey = normaliseType(getValue(item, "type")); groups.get(groupKey).push(item); }); const priorityKey = normaliseType(priorityType); const sections = Array.from(groups.entries()).map(([key, items]) => ({ key, title: sectionLabel(key), items: items.sort((a, b) => normalise(getValue(a, "title")).localeCompare(normalise(getValue(b, "title")))) })).filter((section) => section.items.length > 0).sort((a, b) => { if (priorityKey !== "other") { if (a.key === priorityKey && b.key !== priorityKey) return -1; if (b.key === priorityKey && a.key !== priorityKey) return 1; } return b.items.length - a.items.length || a.title.localeCompare(b.title); }); const showSectionTitles = sections.length > 1; grid.innerHTML = sections.map((section) => `<section class="person-section">${showSectionTitles ? `<h2 class="person-section-title">${section.title}</h2>` : ""}<div class="person-grid-section">${section.items.map(posterCard).join("")}</div></section>`).join(""); }
+  function key(value) {
+    return window.FTS?.Utils?.normalizeComparable ? window.FTS.Utils.normalizeComparable(value) : norm(value).toLowerCase();
+  }
 
-  async function boot() {
-    const params = new URLSearchParams(window.location.search);
-    const genre = normalise(params.get("genre"));
-    const type = normalise(params.get("type"));
-    if (!genre) { redirectTo404("genre"); return; }
-    const target = normaliseKey(genre);
+  function escapeHtml(value) {
+    return window.FTS?.Utils?.escapeHtml ? window.FTS.Utils.escapeHtml(value) : norm(value);
+  }
+
+  function splitComma(value) {
+    return window.FTS?.Utils?.splitComma ? window.FTS.Utils.splitComma(value) : norm(value).split(",").map(norm).filter(Boolean);
+  }
+
+  function getParam(name) {
+    return norm(new URLSearchParams(window.location.search).get(name));
+  }
+
+  function wantedType() {
+    const raw = key(getParam("type"));
+    if (!raw) return "";
+    if (raw === "films" || raw === "film" || raw === "movies" || raw === "movie") return "Film";
+    if (raw === "series" || raw === "tv" || raw === "tv shows" || raw === "show") return "TV";
+    if (raw === "games" || raw === "game" || raw === "video game" || raw === "video games") return "Video Game";
+    if (raw === "music" || raw === "music videos" || raw === "music video") return "Music Video";
+    return "";
+  }
+
+  function posterCard(item) {
+    const title = norm(item.title);
+    const poster = norm(item.poster);
+    return `
+      <a class="genre-card" href="../title/?fl=${encodeURIComponent(title)}" aria-label="${escapeHtml(title)}">
+        <div class="poster-card">
+          ${poster ? `<img src="${escapeHtml(poster)}" alt="${escapeHtml(title)}" loading="lazy">` : `<div class="poster-fallback">${escapeHtml(title)}</div>`}
+        </div>
+      </a>
+    `;
+  }
+
+  function metadataGenreList(row) {
+    return splitComma(row.Genres || row.genres || row.genre || row.Genre);
+  }
+
+  async function getVisibleTitleKeys() {
+    if (window.FTS?.DataStore?.getScenePacks) {
+      const scenePacks = await window.FTS.DataStore.getScenePacks();
+      const hideNoAccess = window.FTS?.Visibility?.hideNoAccessEnabled?.() === true;
+      return hideNoAccess ? scenePacks.publicTitleKeys : scenePacks.allTitleKeys;
+    }
+
+    return null;
+  }
+
+  async function init() {
+    await window.FTS?.Boot?.ready?.({ scenePacks: true, titleDatasets: true });
+
+    const genre = getParam("genre");
+    const type = wantedType();
+
+    if (!genre) {
+      titleEl.textContent = "Genre";
+      copyEl.textContent = "No genre was selected.";
+      gridEl.innerHTML = "";
+      return;
+    }
+
+    titleEl.textContent = genre;
+    document.title = `${genre} | Find That Scene`;
+
     try {
-      const [metadata, visibleTitleKeys] = await Promise.all([fetchMetadataRows(), getVisibleTitleKeys()]);
-      const matches = metadata.filter((item) => splitList(getValue(item, "Genres")).map(normaliseKey).includes(target)).filter((item) => !visibleTitleKeys || visibleTitleKeys.has(normaliseKey(getValue(item, "title"))));
-      if (!matches.length) { redirectTo404("genre"); return; }
+      const [metadataRows, visibleKeys] = await Promise.all([
+        window.FTS.DataStore.getTitleMetadata(),
+        getVisibleTitleKeys()
+      ]);
 
-      const shell = document.querySelector(".person-shell");
-      if (shell) {
-        shell.innerHTML = `
-          <section class="person-hero">
-            <div class="person-hero-copy">
-              <h1 class="person-title" id="genreTitle"></h1>
-              <p class="person-copy" id="genreCopy"></p>
-            </div>
-          </section>
-          <section>
-            <div class="person-grid" id="genreGrid"></div>
-          </section>
-        `;
-      }
+      const matches = metadataRows
+        .filter((row) => !type || norm(row.type) === type)
+        .filter((row) => metadataGenreList(row).some((item) => key(item) === key(genre)))
+        .filter((row) => !visibleKeys || visibleKeys.has(key(row.title)))
+        .sort((a, b) => norm(a.title).localeCompare(norm(b.title), undefined, { sensitivity: "base" }));
 
-      document.title = `${genre} | Find That Scene`;
-      document.getElementById("genreTitle").textContent = genre;
-      document.getElementById("genreCopy").textContent = `${matches.length} title${matches.length === 1 ? "" : "s"} with scenes found.`;
-      renderGroupedPosters(document.getElementById("genreGrid"), matches, type);
-    } catch (error) { console.error(error); redirectTo404("genre"); }
+      copyEl.textContent = `${matches.length} title${matches.length === 1 ? "" : "s"} found.`;
+      gridEl.innerHTML = matches.length
+        ? matches.map(posterCard).join("")
+        : `<div class="poster-fallback">No matches</div>`;
+    } catch (err) {
+      console.error(err);
+      copyEl.textContent = "Could not load this genre.";
+      gridEl.innerHTML = "";
+    }
   }
-  boot();
+
+  init();
 })();
