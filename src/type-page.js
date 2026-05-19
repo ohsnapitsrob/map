@@ -42,16 +42,19 @@
       return obj;
     });
   }
-  async function fetchCSV(url) {
+  async function fetchMetadataRows() {
+    if (window.FTS?.DataStore?.getTitleMetadata) {
+      return window.FTS.DataStore.getTitleMetadata();
+    }
     if (window.FTS?.DataStore?.csvRows) {
-      return window.FTS.DataStore.csvRows("title-metadata", url);
+      return window.FTS.DataStore.csvRows("title-metadata", config.TITLE_METADATA_CSV);
     }
     if (window.FTS?.DataCache?.fetchCSV) {
-      const result = await window.FTS.DataCache.fetchCSV(url);
+      const result = await window.FTS.DataCache.fetchCSV(config.TITLE_METADATA_CSV);
       return result.rows;
     }
-    const response = await fetch(url, { cache: "no-store" });
-    if (!response.ok) throw new Error(`Could not load ${url}`);
+    const response = await fetch(config.TITLE_METADATA_CSV, { cache: "no-store" });
+    if (!response.ok) throw new Error(`Could not load ${config.TITLE_METADATA_CSV}`);
     return rowsToObjects(parseCSV(await response.text()));
   }
   function ensureFallbackStyles() {
@@ -98,7 +101,7 @@
     if (!pageConfig) return;
     ensureFallbackStyles();
     renderLoading();
-    const [rows, visibleTitleKeys] = await Promise.all([fetchCSV(config.TITLE_METADATA_CSV), getVisibleTitleKeys()]);
+    const [rows, visibleTitleKeys] = await Promise.all([fetchMetadataRows(), getVisibleTitleKeys()]);
     const typeKeys = getTypeKeys(pageConfig);
     const matches = rows
       .filter((row) => typeKeys.includes(key(getValue(row, "type"))))
