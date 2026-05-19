@@ -1,7 +1,7 @@
 window.FTS = window.FTS || {};
 
 FTS.DataStore = (function () {
-  const DATASET_CACHE_VERSION = "v2";
+  const DATASET_CACHE_VERSION = "v3";
   const DATASET_CACHE_PREFIX = "fts:dataset";
   const store = new Map();
   const pending = new Map();
@@ -369,7 +369,7 @@ FTS.DataStore = (function () {
 
     if (!url) return [];
 
-    return csvRows("title-metadata", url, options);
+    return csvRows("title-metadata", url, { ...options, persist: true });
   }
 
   async function getTitleMetadataMap(options = {}) {
@@ -386,7 +386,7 @@ FTS.DataStore = (function () {
       });
 
       return map;
-    }, options);
+    }, { ...options, persist: true });
   }
 
   async function getTitleTypes(options = {}) {
@@ -398,7 +398,7 @@ FTS.DataStore = (function () {
           .map((row) => norm(row.type))
           .filter(Boolean)
       )).sort((a, b) => a.localeCompare(b));
-    }, options);
+    }, { ...options, persist: true });
   }
 
   async function getExploreSearchIndexes(builder, options = {}) {
@@ -451,33 +451,32 @@ FTS.DataStore = (function () {
         ? await sceneRowsOrBuilder()
         : (sceneRowsOrBuilder || []);
 
-      const visibleScenes = window.FTS?.Visibility?.getVisibleScenes?.(sceneRows) || sceneRows;
+      const restrictedScenes = sceneRows.filter((row) => getAccessValue(row) !== "");
+      const publicScenes = sceneRows.filter((row) => getAccessValue(row) === "");
+      const visibleScenes = window.FTS?.Visibility?.hideNoAccessEnabled?.() === true ? publicScenes : sceneRows;
       const visibleTitleKeys = new Set(visibleScenes.map((row) => key(row.title)).filter(Boolean));
       const hiddenScenes = sceneRows.filter((row) => !visibleScenes.includes(row));
-      const inaccessibleScenes = sceneRows.filter((row) => getAccessValue(row) === "NOACCESS");
-      const demolishedScenes = sceneRows.filter((row) => getAccessValue(row) === "DEMOLISHED");
-      const inaccessibleTitleKeys = new Set(inaccessibleScenes.map((row) => key(row.title)).filter(Boolean));
-      const demolishedTitleKeys = new Set(demolishedScenes.map((row) => key(row.title)).filter(Boolean));
+      const inaccessibleTitleKeys = new Set(restrictedScenes.map((row) => key(row.title)).filter(Boolean));
 
       return {
         mode: visibilityMode(),
         sceneRows,
         visibleScenes,
         hiddenScenes,
-        inaccessibleScenes,
-        demolishedScenes,
+        inaccessibleScenes: restrictedScenes,
+        demolishedScenes: restrictedScenes.filter((row) => getAccessValue(row) === "DEMOLISHED"),
         visibleTitleKeys,
         inaccessibleTitleKeys,
-        demolishedTitleKeys,
+        demolishedTitleKeys: new Set(restrictedScenes.filter((row) => getAccessValue(row) === "DEMOLISHED").map((row) => key(row.title)).filter(Boolean)),
         counts: {
           scenes: sceneRows.length,
           visibleScenes: visibleScenes.length,
           hiddenScenes: hiddenScenes.length,
-          inaccessibleScenes: inaccessibleScenes.length,
-          demolishedScenes: demolishedScenes.length,
+          inaccessibleScenes: restrictedScenes.length,
+          demolishedScenes: restrictedScenes.filter((row) => getAccessValue(row) === "DEMOLISHED").length,
           visibleTitles: visibleTitleKeys.size,
           inaccessibleTitles: inaccessibleTitleKeys.size,
-          demolishedTitles: demolishedTitleKeys.size
+          demolishedTitles: new Set(restrictedScenes.filter((row) => getAccessValue(row) === "DEMOLISHED").map((row) => key(row.title)).filter(Boolean)).size
         }
       };
     }, options);
