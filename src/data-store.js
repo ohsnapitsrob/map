@@ -1,7 +1,7 @@
 window.FTS = window.FTS || {};
 
 FTS.DataStore = (function () {
-  const DATASET_CACHE_VERSION = "v1";
+  const DATASET_CACHE_VERSION = "v2";
   const DATASET_CACHE_PREFIX = "fts:dataset";
   const store = new Map();
   const pending = new Map();
@@ -41,6 +41,18 @@ FTS.DataStore = (function () {
     return window.FTS?.Utils?.normalizeComparable ? window.FTS.Utils.normalizeComparable(value) : norm(value).toLowerCase();
   }
 
+  function splitPipe(value) {
+    if (window.FTS?.Utils?.splitPipe) return window.FTS.Utils.splitPipe(value);
+    const text = norm(value);
+    return text ? text.split("|").map(norm).filter(Boolean) : [];
+  }
+
+  function splitComma(value) {
+    if (window.FTS?.Utils?.splitComma) return window.FTS.Utils.splitComma(value);
+    const text = norm(value);
+    return text ? text.split(",").map(norm).filter(Boolean) : [];
+  }
+
   function coerceNumber(value) {
     if (window.FTS?.Utils?.coerceNumber) return window.FTS.Utils.coerceNumber(value);
     const number = Number((value ?? "").toString().trim());
@@ -56,6 +68,16 @@ FTS.DataStore = (function () {
     if (window.FTS?.Utils?.parseVisitedDate) return window.FTS.Utils.parseVisitedDate(value);
     const timestamp = Date.parse(norm(value));
     return Number.isFinite(timestamp) ? timestamp : null;
+  }
+
+  function getNationalTrustName(row) {
+    if (window.FTS?.Utils?.getNationalTrustName) return window.FTS.Utils.getNationalTrustName(row);
+    return norm(row?.NationalTrust || row?.["National Trust"] || row?.nt || row?.NT);
+  }
+
+  function getNationalTrustUrl(row) {
+    if (window.FTS?.Utils?.getNationalTrustUrl) return window.FTS.Utils.getNationalTrustUrl(row);
+    return norm(row?.NTURL || row?.["NT URL"] || row?.nturl || row?.ntUrl);
   }
 
   function visibilityMode() {
@@ -283,24 +305,39 @@ FTS.DataStore = (function () {
     const lat = coerceNumber(row.lat);
     const lng = coerceNumber(row.lng);
     const title = norm(row.title);
+    const type = normalizeType(row.type || fallbackType);
+    const ntName = getNationalTrustName(row);
 
     if (!title || typeof lat !== "number" || typeof lng !== "number") return null;
 
     return {
       ...row,
+      id: norm(row.id),
       title,
-      type: normalizeType(row.type || fallbackType),
-      series: norm(row.series),
+      type,
+      series: norm(row.series) || (type === "TV" ? title : ""),
       place: norm(row.place),
-      city: norm(row.city || row.place),
+      city: norm(row.city || row.town || row.place),
       country: norm(row.country),
-      lat,
-      lng,
       description: norm(row.description),
-      thumbnail: norm(row.thumbnail),
+      collections: splitPipe(row.collections),
+      keywords: splitPipe(row.keywords),
+      aliases: splitPipe(row.aliases),
+      images: splitPipe(row.images),
+      rating: splitComma(row.rating).map((value) => value.toLowerCase()),
       access: getAccessValue(row),
+      exportFileName: norm(row["export-file-name"]),
+      imdb: norm(row.imdb),
+      justwatch: norm(row.justwatch),
+      NationalTrust: ntName,
+      NTURL: getNationalTrustUrl(row),
+      rawDate: norm(row["raw-date"]),
+      dateFormatted: norm(row["date-formatted"]),
+      monthShort: norm(row["month-short"]),
       railOrder: coerceNumber(row["set-rail-order"]),
       visitedTs: parseVisitedDate(row["date-formatted"] || row["raw-date"] || row.visited || row["visit-date"]),
+      lat,
+      lng,
       _raw: row
     };
   }
