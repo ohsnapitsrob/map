@@ -166,6 +166,10 @@ App.Data = (function () {
   }
 
   async function loadTitleMetadata() {
+    if (window.FTS?.DataStore?.getTitleMetadataMap) {
+      return window.FTS.DataStore.getTitleMetadataMap();
+    }
+
     const cfg = window.APP_CONFIG || {};
     const url = cfg.TITLE_METADATA_CSV || cfg.TITLE_METADATA || cfg.TITLES_METADATA_CSV;
 
@@ -230,67 +234,79 @@ App.Data = (function () {
       .filter(Boolean);
   }
 
-  function addVisibleGroup(groups, kind, label, markers) {
+  function addVisibleGroup(groups, kind, label, markers, groupsIdx) {
     const visible = visibleMarkers(markers);
 
     if (!visible.length) return;
 
     groups.push({ kind, label, count: visible.length });
-    groupsIndex.set(`${kind}::${label}`, visible);
+    groupsIdx.set(`${kind}::${label}`, visible);
   }
 
-  function buildSearchIndexes() {
-    const searchLocations = visibleLocations();
-    const groups = [];
+  async function buildSearchIndexes() {
+    if (window.FTS?.DataStore?.getExploreSearchIndexes) {
+      const searchData = await window.FTS.DataStore.getExploreSearchIndexes(async () => {
+        const searchLocations = visibleLocations();
+        const groups = [];
+        const localGroupsIndex = new Map();
 
-    groupsIndex.clear();
+        const markersByTitle = new Map();
+        const markersBySeries = new Map();
+        const markersByCollection = new Map();
+        const markersByType = new Map();
 
-    const markersByTitle = new Map();
-    const markersBySeries = new Map();
-    const markersByCollection = new Map();
-    const markersByType = new Map();
+        allMarkers.forEach((marker) => {
+          const loc = marker.__loc;
+          if (!loc) return;
 
-    allMarkers.forEach((marker) => {
-      const loc = marker.__loc;
-      if (!loc) return;
+          addToMapList(markersByTitle, loc.title, marker);
+          addToMapList(markersBySeries, loc.series, marker);
+          (loc.collections || []).forEach((c) => addToMapList(markersByCollection, c, marker));
+          addToMapList(markersByType, loc.type, marker);
+        });
 
-      addToMapList(markersByTitle, loc.title, marker);
-      addToMapList(markersBySeries, loc.series, marker);
-      (loc.collections || []).forEach((c) => addToMapList(markersByCollection, c, marker));
-      addToMapList(markersByType, loc.type, marker);
-    });
+        markersByTitle.forEach((arr, title) => addVisibleGroup(groups, "Title", title, arr, localGroupsIndex));
+        markersBySeries.forEach((arr, series) => addVisibleGroup(groups, "Series", series, arr, localGroupsIndex));
+        markersByCollection.forEach((arr, col) => addVisibleGroup(groups, "Collection", col, arr, localGroupsIndex));
+        markersByType.forEach((arr, type) => addVisibleGroup(groups, "Type", type, arr, localGroupsIndex));
 
-    markersByTitle.forEach((arr, title) => addVisibleGroup(groups, "Title", title, arr));
-    markersBySeries.forEach((arr, series) => addVisibleGroup(groups, "Series", series, arr));
-    markersByCollection.forEach((arr, col) => addVisibleGroup(groups, "Collection", col, arr));
-    markersByType.forEach((arr, type) => addVisibleGroup(groups, "Type", type, arr));
+        return {
+          searchLocations,
+          groups,
+          groupsIndex: localGroupsIndex,
+          fuseLocations: new Fuse(searchLocations, {
+            threshold: 0.35,
+            keys: [
+              { name: "title", weight: 3 },
+              { name: "collections", weight: 2.3 },
+              { name: "series", weight: 1.8 },
+              { name: "aliases", weight: 1.8 },
+              { name: "place", weight: 1.7 },
+              { name: "country", weight: 1.2 },
+              { name: "type", weight: 1.1 },
+              { name: "keywords", weight: 1.4 },
+              { name: "description", weight: 0.8 }
+            ]
+          }),
+          fuseGroups: new Fuse(groups, {
+            threshold: 0.35,
+            keys: ["label", "kind"]
+          })
+        };
+      });
 
-    const fuseLocations = new Fuse(searchLocations, {
-      threshold: 0.35,
-      keys: [
-        { name: "title", weight: 3 },
-        { name: "collections", weight: 2.3 },
-        { name: "series", weight: 1.8 },
-        { name: "aliases", weight: 1.8 },
-        { name: "place", weight: 1.7 },
-        { name: "country", weight: 1.2 },
-        { name: "type", weight: 1.1 },
-        { name: "keywords", weight: 1.4 },
-        { name: "description", weight: 0.8 }
-      ]
-    });
+      groupsIndex.clear();
+      searchData.groupsIndex.forEach((value, key) => groupsIndex.set(key, value));
 
-    const fuseGroups = new Fuse(groups, {
-      threshold: 0.35,
-      keys: ["label", "kind"]
-    });
+      App.Search.setData({
+        fuseLoc: searchData.fuseLocations,
+        fuseGrp: searchData.fuseGroups,
+        groupsIdx: groupsIndex,
+        allMk: visibleMarkers(allMarkers)
+      });
 
-    App.Search.setData({
-      fuseLoc: fuseLocations,
-      fuseGrp: fuseGroups,
-      groupsIdx: groupsIndex,
-      allMk: visibleMarkers(allMarkers)
-    });
+      return;
+    }
   }
 
   async function init() {
@@ -346,10 +362,14 @@ App.Data = (function () {
 
       App.Map.rebuildCluster(allMarkers);
       App.State.clearFilter();
-      buildSearchIndexes();
+      await buildSearchIndexes();
 
-      window.addEventListener("fts:app-settings-updated", () => {
-        buildSearchIndexes();
+      window.addEventListener("fts:app-settings-updated", async () => {
+        if (window.FTS?.DataStore?.clear) {
+          window.FTS.DataStore.clear("explore-search-indexes");
+        }
+
+        await buildSearchIndexes();
       });
     } catch (err) {
       console.error(err);
