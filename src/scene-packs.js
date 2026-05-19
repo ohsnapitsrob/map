@@ -12,11 +12,13 @@ window.FTS = window.FTS || {};
   }
 
   function accessValue(scene) {
+    if (window.FTS?.Visibility?.accessValue) return window.FTS.Visibility.accessValue(scene);
     const raw = scene?.access || scene?.Access || scene?.ACCESS || scene?.["access "] || scene?.["Access "] || scene?.["No Access"] || scene?.noaccess || scene?.NOACCESS;
     return norm(raw).toUpperCase();
   }
 
   function isRestrictedScene(scene) {
+    if (window.FTS?.Visibility?.isRestrictedScene) return window.FTS.Visibility.isRestrictedScene(scene);
     return accessValue(scene) !== "";
   }
 
@@ -52,7 +54,7 @@ window.FTS = window.FTS || {};
           onlyRestrictedTitles: onlyRestrictedTitleKeys.size
         }
       };
-    }, options);
+    }, { ...options, persist: true });
   }
 
   window.FTS.DataStore.getScenePacks = getScenePacks;
