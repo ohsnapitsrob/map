@@ -25,10 +25,16 @@ FTS.Visibility = (function () {
       .toUpperCase();
   }
 
-  function shouldHideScene(scene) {
-    const settings = getSettings();
+  function hideNoAccessEnabled() {
+    return getSettings().hideNoAccessScenes === true;
+  }
 
-    if (settings.hideNoAccessScenes !== true) {
+  function mode() {
+    return hideNoAccessEnabled() ? "public-only" : "all";
+  }
+
+  function shouldHideScene(scene) {
+    if (!hideNoAccessEnabled()) {
       return false;
     }
 
@@ -52,6 +58,9 @@ FTS.Visibility = (function () {
   return {
     shouldHideScene,
     getVisibleScenes,
-    hasVisibleScenes
+    hasVisibleScenes,
+    hideNoAccessEnabled,
+    mode,
+    normaliseAccess
   };
 })();
