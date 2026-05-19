@@ -9,6 +9,10 @@ FTS.DataStore = (function () {
     return window.RUNTIME_CONFIG || {};
   }
 
+  function appConfig() {
+    return window.APP_CONFIG || {};
+  }
+
   function environment() {
     return runtimeConfig().environment || "live";
   }
@@ -27,23 +31,31 @@ FTS.DataStore = (function () {
     console.info(`[FTS DataStore] ${event}`, details || "");
   }
 
-  function has(key) {
-    return store.has(key);
+  function norm(value) {
+    return (value || "").toString().trim();
   }
 
-  function get(key) {
-    return store.get(key);
+  function key(value) {
+    return norm(value).toLowerCase();
   }
 
-  function set(key, value, info = {}) {
-    store.set(key, value);
-    metadata.set(key, {
+  function has(keyName) {
+    return store.has(keyName);
+  }
+
+  function get(keyName) {
+    return store.get(keyName);
+  }
+
+  function set(keyName, value, info = {}) {
+    store.set(keyName, value);
+    metadata.set(keyName, {
       updatedAt: new Date().toISOString(),
       ...info
     });
 
     log("stored dataset", {
-      key,
+      key: keyName,
       rows: Array.isArray(value) ? value.length : undefined,
       info
     });
@@ -51,17 +63,17 @@ FTS.DataStore = (function () {
     return value;
   }
 
-  function info(key) {
-    return metadata.get(key) || null;
+  function info(keyName) {
+    return metadata.get(keyName) || null;
   }
 
-  function clear(key) {
-    if (typeof key === "string") {
-      store.delete(key);
-      metadata.delete(key);
-      pending.delete(key);
+  function clear(keyName) {
+    if (typeof keyName === "string") {
+      store.delete(keyName);
+      metadata.delete(keyName);
+      pending.delete(keyName);
 
-      log("cleared dataset", { key });
+      log("cleared dataset", { key: keyName });
       return;
     }
 
@@ -72,48 +84,86 @@ FTS.DataStore = (function () {
     log("cleared all datasets");
   }
 
-  async function remember(key, loader, options = {}) {
-    if (has(key) && options.force !== true) {
-      log("memory hit", { key });
-      return get(key);
+  async function remember(keyName, loader, options = {}) {
+    if (has(keyName) && options.force !== true) {
+      log("memory hit", { key: keyName });
+      return get(keyName);
     }
 
-    if (pending.has(key) && options.force !== true) {
-      log("awaiting existing loader", { key });
-      return pending.get(key);
+    if (pending.has(keyName) && options.force !== true) {
+      log("awaiting existing loader", { key: keyName });
+      return pending.get(keyName);
     }
 
     const startedAt = performance.now();
 
     const promise = (async () => {
       try {
-        log("building dataset", { key });
+        log("building dataset", { key: keyName });
 
         const value = await loader();
 
-        set(key, value, {
+        set(keyName, value, {
           buildMs: Math.round(performance.now() - startedAt)
         });
 
         return value;
       } finally {
-        pending.delete(key);
+        pending.delete(keyName);
       }
     })();
 
-    pending.set(key, promise);
+    pending.set(keyName, promise);
 
     return promise;
   }
 
-  async function csvRows(key, url, options = {}) {
-    return remember(key, async () => {
+  async function csvRows(keyName, url, options = {}) {
+    return remember(keyName, async () => {
       if (!window.FTS?.DataCache?.fetchCSV) {
         throw new Error("FTS.DataCache.fetchCSV is required before DataStore.csvRows can be used.");
       }
 
       const result = await window.FTS.DataCache.fetchCSV(url, options);
       return result.rows;
+    }, options);
+  }
+
+  async function getTitleMetadata(options = {}) {
+    const config = appConfig();
+    const url = config.TITLE_METADATA_CSV;
+
+    if (!url) return [];
+
+    return csvRows("title-metadata", url, options);
+  }
+
+  async function getTitleMetadataMap(options = {}) {
+    return remember("title-metadata-map", async () => {
+      const rows = await getTitleMetadata(options);
+
+      const map = new Map();
+
+      rows.forEach((row) => {
+        const title = norm(row.title);
+        if (!title) return;
+
+        map.set(key(title), row);
+      });
+
+      return map;
+    }, options);
+  }
+
+  async function getTitleTypes(options = {}) {
+    return remember("title-types", async () => {
+      const rows = await getTitleMetadata(options);
+
+      return Array.from(new Set(
+        rows
+          .map((row) => norm(row.type))
+          .filter(Boolean)
+      )).sort((a, b) => a.localeCompare(b));
     }, options);
   }
 
@@ -134,6 +184,9 @@ FTS.DataStore = (function () {
     clear,
     remember,
     csvRows,
+    getTitleMetadata,
+    getTitleMetadataMap,
+    getTitleTypes,
     snapshot
   };
 })();
