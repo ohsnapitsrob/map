@@ -2,6 +2,8 @@ window.FTS = window.FTS || {};
 
 FTS.AppHeaderTitleSearch = (function () {
   function escapeHtml(value) {
+    if (window.FTS?.Utils?.escapeHtml) return window.FTS.Utils.escapeHtml(value);
+
     return (value || "").toString()
       .replaceAll("&", "&amp;")
       .replaceAll("<", "&lt;")
@@ -11,10 +13,18 @@ FTS.AppHeaderTitleSearch = (function () {
   }
 
   function norm(value) {
-    return (value || "").toString().trim();
+    return window.FTS?.Utils?.norm ? window.FTS.Utils.norm(value) : (value || "").toString().trim();
+  }
+
+  function normalizeComparable(value) {
+    return window.FTS?.Utils?.normalizeComparable ? window.FTS.Utils.normalizeComparable(value) : norm(value).toLowerCase();
   }
 
   function normaliseType(value) {
+    if (window.FTS?.Utils?.displayType && window.FTS?.Utils?.normalizeType) {
+      return window.FTS.Utils.displayType(window.FTS.Utils.normalizeType(value));
+    }
+
     const type = norm(value).toLowerCase();
     if (type === "film" || type === "movie" || type === "movies") return "Movie";
     if (type === "tv" || type === "tv show" || type === "tv shows" || type === "series") return "TV Show";
@@ -23,104 +33,9 @@ FTS.AppHeaderTitleSearch = (function () {
     return norm(value) || "Title";
   }
 
-  function normalizeComparable(value) {
-    return norm(value).toLowerCase();
-  }
-
   function getNoResultsMessage(query) {
     const easterEggMessage = window.FTS?.EasterEggs?.getTitleSearchNoResultsMessage?.(query);
     return easterEggMessage || "No matching titles.";
-  }
-
-  function getAccessValue(row) {
-    return norm(
-      row.access ||
-      row.Access ||
-      row.ACCESS ||
-      row["access "] ||
-      row["Access "] ||
-      row["No Access"] ||
-      row.noaccess ||
-      row.NOACCESS
-    );
-  }
-
-  function hideNoAccessEnabled() {
-    if (window.FTS?.AppSettings?.getSettings) {
-      return window.FTS.AppSettings.getSettings().hideNoAccessScenes === true;
-    }
-
-    try {
-      return JSON.parse(localStorage.getItem("fts-app-settings") || "{}").hideNoAccessScenes === true;
-    } catch (err) {
-      return false;
-    }
-  }
-
-  function sceneIsVisible(row) {
-    if (!hideNoAccessEnabled()) return true;
-
-    const helper = window.FTS?.Visibility;
-    if (helper?.shouldHideScene) return !helper.shouldHideScene(row);
-
-    return getAccessValue(row) === "";
-  }
-
-  function parseCSV(text) {
-    const rows = [];
-    let row = [];
-    let current = "";
-    let inQuotes = false;
-
-    for (let i = 0; i < text.length; i++) {
-      const character = text[i];
-      const next = text[i + 1];
-
-      if (character === '"' && inQuotes && next === '"') {
-        current += '"';
-        i++;
-        continue;
-      }
-
-      if (character === '"') {
-        inQuotes = !inQuotes;
-        continue;
-      }
-
-      if (character === "," && !inQuotes) {
-        row.push(current);
-        current = "";
-        continue;
-      }
-
-      if ((character === "\n" || character === "\r") && !inQuotes) {
-        if (character === "\r" && next === "\n") i++;
-        row.push(current);
-        current = "";
-        if (row.length > 1 || (row.length === 1 && row[0] !== "")) rows.push(row);
-        row = [];
-        continue;
-      }
-
-      current += character;
-    }
-
-    row.push(current);
-    if (row.length > 1 || (row.length === 1 && row[0] !== "")) rows.push(row);
-    return rows;
-  }
-
-  function rowsToObjects(rows) {
-    if (!rows.length) return [];
-    const header = rows[0].map(norm);
-
-    return rows.slice(1).filter((row) => row.some((cell) => norm(cell))).map((row) => {
-      const object = {};
-      header.forEach((key, index) => {
-        object[key] = row[index] || "";
-      });
-      return object;
-    });
   }
 
   function getRootPath() {
@@ -133,81 +48,66 @@ FTS.AppHeaderTitleSearch = (function () {
     return `${getRootPath()}title/?${params.toString()}`;
   }
 
-  function configuredSources() {
-    const config = window.APP_CONFIG || {};
-    const sheets = config.SHEETS || {};
-
-    return [
-      ["Movie", sheets.movies],
-      ["TV Show", sheets.tv],
-      ["Music Video", sheets.music_videos],
-      ["Video Game", sheets.games],
-      ["Title", sheets.misc]
-    ].filter(([, url]) => Boolean(url));
+  function metadataTitleType(meta, titleEntry) {
+    return normaliseType(meta?.type || titleEntry?.type || "Title");
   }
 
-  async function loadSceneTitleIndex() {
-    const map = new Map();
+  function metadataToSearchItem(meta, titleEntry) {
+    const title = norm(meta?.title || titleEntry?.title);
+    if (!title) return null;
 
-    await Promise.all(configuredSources().map(async ([fallbackType, url]) => {
-      const response = await fetch(url, { cache: "no-store" });
-      const rows = rowsToObjects(parseCSV(await response.text()));
-
-      rows.forEach((row) => {
-        if (!sceneIsVisible(row)) return;
-
-        const title = norm(row.title);
-        if (!title) return;
-
-        const key = normalizeComparable(title);
-        if (!map.has(key)) {
-          map.set(key, {
-            title,
-            type: normaliseType(row.type || fallbackType)
-          });
-        }
-      });
-    }));
-
-    return map;
-  }
-
-  async function loadMetadataTitleIndex(visibleTitleMap) {
-    const config = window.APP_CONFIG || {};
-    const metadataUrl = config.TITLE_METADATA_CSV;
-
-    if (!metadataUrl) return [];
-
-    const response = await fetch(metadataUrl, { cache: "no-store" });
-    const rows = rowsToObjects(parseCSV(await response.text()));
-
-    return rows.map((row) => {
-      const title = norm(row.title);
-      const key = normalizeComparable(title);
-      const sceneTitle = visibleTitleMap.get(key);
-
-      return {
-        title,
-        type: normaliseType(row.type || sceneTitle?.type)
-      };
-    }).filter((row) => {
-      if (!row.title) return false;
-      if (!configuredSources().length) return true;
-      return visibleTitleMap.has(normalizeComparable(row.title));
-    });
+    return {
+      title,
+      type: metadataTitleType(meta, titleEntry)
+    };
   }
 
   async function loadTitleIndex() {
-    const visibleTitleMap = await loadSceneTitleIndex();
+    await window.FTS?.Boot?.ready?.({
+      titleVisibility: true,
+      titleDatasets: true
+    });
 
-    try {
-      const metadataTitles = await loadMetadataTitleIndex(visibleTitleMap);
-      if (metadataTitles.length) return metadataTitles;
-    } catch (err) {
-      console.warn("Could not load title metadata for search", err);
-    }
+    const titleDatasets = window.FTS?.DataStore?.getTitleDatasets
+      ? await window.FTS.DataStore.getTitleDatasets()
+      : null;
 
-    return Array.from(visibleTitleMap.values());
+    const visibleTitleKeys = window.FTS?.TitleVisibility?.visibleTitleKeys
+      ? await window.FTS.TitleVisibility.visibleTitleKeys()
+      : null;
+
+    const metadataRows = window.FTS?.DataStore?.getTitleMetadata
+      ? await window.FTS.DataStore.getTitleMetadata()
+      : [];
+
+    const entryByKey = titleDatasets?.allByTitleKey || titleDatasets?.byTitleKey || new Map();
+    const configuredRows = metadataRows.length
+      ? metadataRows
+      : Array.from(entryByKey.values()).map((entry) => ({
+        title: entry.title,
+        type: entry.type
+      }));
+
+    const items = configuredRows
+      .map((meta) => {
+        const titleKey = normalizeComparable(meta.title);
+        const titleEntry = entryByKey.get(titleKey);
+
+        if (visibleTitleKeys && !visibleTitleKeys.has(titleKey)) return null;
+
+        return metadataToSearchItem(meta, titleEntry);
+      })
+      .filter(Boolean);
+
+    const deduped = new Map();
+
+    items.forEach((item) => {
+      const titleKey = normalizeComparable(item.title);
+      if (!titleKey) return;
+      if (!deduped.has(titleKey)) deduped.set(titleKey, item);
+    });
+
+    return Array.from(deduped.values()).sort((a, b) => a.title.localeCompare(b.title));
   }
 
   function addStyle() {
@@ -360,7 +260,13 @@ FTS.AppHeaderTitleSearch = (function () {
     async function ensureLoaded() {
       if (loaded) return;
       loaded = true;
-      index = await loadTitleIndex();
+
+      try {
+        index = await loadTitleIndex();
+      } catch (err) {
+        console.error("Could not load title search index", err);
+        index = [];
+      }
     }
 
     function closeModal() {
