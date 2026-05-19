@@ -75,9 +75,11 @@ FTS.HomeV2Data = (function () {
     return groups.flat();
   }
 
-  function buildEntries(sceneRows, metadataRows) {
+  function buildEntries(sceneRows, metadataRows, visibility) {
     const metaByTitle = new Map(metadataRows.map((meta) => [U.key(meta.title), meta]));
     const grouped = new Map();
+    const inaccessibleTitleKeys = visibility?.inaccessibleTitleKeys || new Set();
+    const visibleTitleKeys = visibility?.visibleTitleKeys || new Set();
 
     sceneRows.forEach((row) => {
       const titleKey = U.key(row.title);
@@ -116,10 +118,15 @@ FTS.HomeV2Data = (function () {
       if (!Number.isFinite(entry.latestVisitedTs) || row.visitedTs > entry.latestVisitedTs) entry.latestVisitedTs = row.visitedTs;
     });
 
-    return Array.from(grouped.values()).map((entry) => ({
-      ...entry,
-      onlyNoAccess: entry.count > 0 && entry.visibleCount === 0 && entry.noAccessCount > 0
-    }));
+    return Array.from(grouped.values()).map((entry) => {
+      const titleKey = U.key(entry.title);
+      const onlyNoAccess = inaccessibleTitleKeys.has(titleKey) && !visibleTitleKeys.has(titleKey);
+
+      return {
+        ...entry,
+        onlyNoAccess
+      };
+    }).filter((entry) => !entry.onlyNoAccess || !window.FTS?.Visibility?.hideNoAccessEnabled?.());
   }
 
   function buildDerivedDatasets(entries, visibleRows, metadataRows) {
@@ -151,8 +158,12 @@ FTS.HomeV2Data = (function () {
       loadPeopleRows()
     ]);
 
-    const visibleRows = window.FTS?.Visibility?.getVisibleScenes?.(sceneRows) || sceneRows;
-    const entries = buildEntries(visibleRows, metadataRows);
+    const visibility = window.FTS?.DataStore?.getVisibilityDatasets
+      ? await window.FTS.DataStore.getVisibilityDatasets(sceneRows)
+      : null;
+
+    const visibleRows = visibility?.visibleScenes || sceneRows;
+    const entries = buildEntries(sceneRows, metadataRows, visibility);
     const derived = buildDerivedDatasets(entries, visibleRows, metadataRows);
 
     return {
@@ -160,6 +171,7 @@ FTS.HomeV2Data = (function () {
       visibleRows,
       metadataRows,
       peopleRows,
+      visibility,
       entries,
       ...derived
     };
