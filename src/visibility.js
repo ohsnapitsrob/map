@@ -25,6 +25,23 @@ FTS.Visibility = (function () {
       .toUpperCase();
   }
 
+  function accessValue(scene) {
+    return normaliseAccess(
+      scene?.Access ||
+      scene?.access ||
+      scene?.ACCESS ||
+      scene?.["access "] ||
+      scene?.["Access "] ||
+      scene?.["No Access"] ||
+      scene?.noaccess ||
+      scene?.NOACCESS
+    );
+  }
+
+  function isRestrictedScene(scene) {
+    return accessValue(scene) !== "";
+  }
+
   function hideNoAccessEnabled() {
     return getSettings().hideNoAccessScenes === true;
   }
@@ -38,13 +55,7 @@ FTS.Visibility = (function () {
       return false;
     }
 
-    const access = normaliseAccess(
-      scene?.Access ||
-      scene?.access ||
-      scene?.ACCESS
-    );
-
-    return access === "NOACCESS";
+    return isRestrictedScene(scene);
   }
 
   function getVisibleScenes(scenes) {
@@ -61,6 +72,8 @@ FTS.Visibility = (function () {
     hasVisibleScenes,
     hideNoAccessEnabled,
     mode,
-    normaliseAccess
+    normaliseAccess,
+    accessValue,
+    isRestrictedScene
   };
 })();
