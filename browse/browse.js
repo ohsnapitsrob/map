@@ -121,9 +121,8 @@
   }
 
   function buildEntries(rows) {
-    const visibleRows = FTS.Visibility?.getVisibleScenes?.(rows) || rows;
     const grouped = new Map();
-    visibleRows.forEach((location) => {
+    rows.forEach((location) => {
       const key = `${location.title}|||${location.type}`;
       if (!grouped.has(key)) {
         grouped.set(key, { title: location.title, type: location.type, count: 0, latestVisitedTs: null, cities: new Set(), countries: new Set() });
@@ -139,10 +138,21 @@
     return Array.from(grouped.values()).map((entry) => ({ ...entry, cities: Array.from(entry.cities), countries: Array.from(entry.countries) }));
   }
 
+  async function loadBrowseRows() {
+    if (window.FTS?.DataStore?.getScenePacks) {
+      const scenePacks = await window.FTS.DataStore.getScenePacks();
+      const hideNoAccess = window.FTS?.Visibility?.hideNoAccessEnabled?.() === true;
+      return hideNoAccess ? scenePacks.publicScenes : scenePacks.allScenes;
+    }
+
+    const rows = await loadAll();
+    return FTS.Visibility?.getVisibleScenes?.(rows) || rows;
+  }
+
   async function init() {
     try {
       listEl.innerHTML = `<div class="fts-loader" aria-label="Loading"></div>`;
-      const rows = await loadAll();
+      const rows = await loadBrowseRows();
       allEntries = buildEntries(rows);
       searchEl.addEventListener("input", applyControls);
       sortEl.addEventListener("change", applyControls);
