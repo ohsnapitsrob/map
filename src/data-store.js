@@ -167,6 +167,24 @@ FTS.DataStore = (function () {
     }, options);
   }
 
+  async function getExploreSearchIndexes(builder, options = {}) {
+    return remember("explore-search-indexes", async () => {
+      if (typeof builder !== "function") {
+        throw new Error("FTS.DataStore.getExploreSearchIndexes requires a builder function.");
+      }
+
+      const result = await builder();
+
+      return {
+        fuseLocations: result.fuseLocations,
+        fuseGroups: result.fuseGroups,
+        groupsIndex: result.groupsIndex,
+        searchLocations: result.searchLocations,
+        groups: result.groups
+      };
+    }, options);
+  }
+
   function snapshot() {
     return {
       keys: Array.from(store.keys()),
@@ -187,6 +205,7 @@ FTS.DataStore = (function () {
     getTitleMetadata,
     getTitleMetadataMap,
     getTitleTypes,
+    getExploreSearchIndexes,
     snapshot
   };
 })();
