@@ -39,6 +39,19 @@ FTS.DataStore = (function () {
     return norm(value).toLowerCase();
   }
 
+  function getAccessValue(row) {
+    return norm(
+      row?.access ||
+      row?.Access ||
+      row?.ACCESS ||
+      row?.["access "] ||
+      row?.["Access "] ||
+      row?.["No Access"] ||
+      row?.noaccess ||
+      row?.NOACCESS
+    ).toUpperCase();
+  }
+
   function has(keyName) {
     return store.has(keyName);
   }
@@ -210,6 +223,43 @@ FTS.DataStore = (function () {
     }, options);
   }
 
+  async function getVisibilityDatasets(sceneRowsOrBuilder, options = {}) {
+    return remember("visibility-datasets", async () => {
+      const sceneRows = typeof sceneRowsOrBuilder === "function"
+        ? await sceneRowsOrBuilder()
+        : (sceneRowsOrBuilder || []);
+
+      const visibleScenes = window.FTS?.Visibility?.getVisibleScenes?.(sceneRows) || sceneRows;
+      const visibleTitleKeys = new Set(visibleScenes.map((row) => key(row.title)).filter(Boolean));
+      const hiddenScenes = sceneRows.filter((row) => !visibleScenes.includes(row));
+      const inaccessibleScenes = sceneRows.filter((row) => getAccessValue(row) === "NOACCESS");
+      const demolishedScenes = sceneRows.filter((row) => getAccessValue(row) === "DEMOLISHED");
+      const inaccessibleTitleKeys = new Set(inaccessibleScenes.map((row) => key(row.title)).filter(Boolean));
+      const demolishedTitleKeys = new Set(demolishedScenes.map((row) => key(row.title)).filter(Boolean));
+
+      return {
+        sceneRows,
+        visibleScenes,
+        hiddenScenes,
+        inaccessibleScenes,
+        demolishedScenes,
+        visibleTitleKeys,
+        inaccessibleTitleKeys,
+        demolishedTitleKeys,
+        counts: {
+          scenes: sceneRows.length,
+          visibleScenes: visibleScenes.length,
+          hiddenScenes: hiddenScenes.length,
+          inaccessibleScenes: inaccessibleScenes.length,
+          demolishedScenes: demolishedScenes.length,
+          visibleTitles: visibleTitleKeys.size,
+          inaccessibleTitles: inaccessibleTitleKeys.size,
+          demolishedTitles: demolishedTitleKeys.size
+        }
+      };
+    }, options);
+  }
+
   function snapshot() {
     return {
       keys: Array.from(store.keys()),
@@ -232,6 +282,7 @@ FTS.DataStore = (function () {
     getTitleTypes,
     getExploreSearchIndexes,
     getHomepageDatasets,
+    getVisibilityDatasets,
     snapshot
   };
 })();
