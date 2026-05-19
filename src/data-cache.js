@@ -179,7 +179,7 @@ FTS.DataCache = (function () {
     toggle.setAttribute("type", "button");
     toggle.style.position = "fixed";
     toggle.style.left = "16px";
-    toggle.style.bottom = "84px";
+    toggle.style.bottom = "calc(env(safe-area-inset-bottom, 0px) + 104px)";
     toggle.style.zIndex = "99999";
     toggle.style.border = "0";
     toggle.style.borderRadius = "999px";
