@@ -80,9 +80,10 @@
   }
 
   function loadPrivacySystem() {
-    return loadSharedScript("privacy-consent.js", "data-fts-privacy-consent")
-      .then(() => dispatchReady("privacy"));
-  }
+  return loadSharedScript("privacy-consent.js", "data-fts-privacy-consent")
+    .then(() => loadSharedScript("privacy-consent-cache-safe.js", "data-fts-privacy-consent-cache-safe"))
+    .then(() => dispatchReady("privacy"));
+}
 
   function loadAppSettings() {
     return loadSharedScript("app-settings.js", "data-fts-app-settings")
