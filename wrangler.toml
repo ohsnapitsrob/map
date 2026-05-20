@@ -1,4 +1,4 @@
-compatibility_date = "2026-05-16"
+name = "fts-staging"compatibility_date = "2026-05-16"
 
 [assets]
 directory = "./"
